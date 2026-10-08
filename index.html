@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Tibetan sentence annotation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Tibetan:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon.ico" sizes="16x16">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="wrap site-header">
+    <h1>Tibetan sentence annotation</h1>
+    <p class="lede">Upload a CSV of sentence pairs. Source stays fixed; correct the target, then accept, edit, or reject each row.</p>
+  </header>
+
+  <div id="tools" class="tools">
+    <div class="wrap tools-inner">
+      <div class="actions">
+        <label class="btn primary" for="file-input">Upload CSV</label>
+        <input id="file-input" class="sr-only" type="file" accept=".csv,text/csv">
+        <button id="download-btn" class="btn" type="button" disabled>Download CSV</button>
+        <button id="reset-btn" class="btn danger" type="button" disabled>Reset</button>
+      </div>
+
+      <div id="session-bar" class="session-bar hidden">
+        <p id="file-label"></p>
+        <p id="save-label"></p>
+      </div>
+
+      <div id="stats" class="stats hidden">
+        <div class="stats-main">
+          <p id="row-position" class="row-position">Row 0 of 0</p>
+          <div id="meter" class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Reviewed rows">
+            <span id="meter-fill"></span>
+          </div>
+        </div>
+        <ul class="counts">
+          <li data-count="accepted">Accepted <strong id="count-accepted">0</strong></li>
+          <li data-count="edited">Edited <strong id="count-edited">0</strong></li>
+          <li data-count="rejected">Rejected <strong id="count-rejected">0</strong></li>
+          <li data-count="pending">Pending <strong id="count-pending">0</strong></li>
+        </ul>
+      </div>
+
+      <div id="toolbar" class="toolbar hidden">
+        <div class="filters" role="group" aria-label="Filter rows">
+          <button type="button" data-filter="all" aria-pressed="true">All</button>
+          <button type="button" data-filter="pending">Pending</button>
+          <button type="button" data-filter="accepted">Accepted</button>
+          <button type="button" data-filter="edited">Edited</button>
+          <button type="button" data-filter="rejected">Rejected</button>
+        </div>
+        <p class="hint">Editing the target marks the row as edited.</p>
+        <div class="toolbar-controls">
+          <button id="next-pending" class="btn small" type="button">Next pending</button>
+          <div class="control">
+            <label for="goto-input">Go to row</label>
+            <input id="goto-input" type="number" min="1" step="1" inputmode="numeric">
+            <button id="goto-btn" class="btn small" type="button">Go</button>
+          </div>
+          <div class="control">
+            <label for="page-size">Rows per page</label>
+            <select id="page-size">
+              <option value="10">10</option>
+              <option value="20" selected>20</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+          <div class="pager" aria-label="Pages">
+            <button type="button" data-pager="prev">Previous</button>
+            <p data-page-label>Page 1 of 1</p>
+            <button type="button" data-pager="next">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p id="banner" class="wrap banner hidden" role="status"></p>
+
+  <main class="wrap">
+    <section id="drop-zone" class="drop-zone" tabindex="0" aria-label="Upload CSV. Activate to choose a file, or drop a file here.">
+      <h2>Drop a CSV here</h2>
+      <p>The header row must include <code>source</code> and <code>target</code>. Other columns, such as <code>diff_category</code>, <code>page_id</code>, and <code>segment_idx</code>, stay in the file you download.</p>
+      <details>
+        <summary>What the download contains</summary>
+        <p>Every original column, plus <code>corrected_target</code> and <code>status</code>. Status is <code>pending</code>, <code>accepted</code>, <code>edited</code>, or <code>rejected</code>. The file is UTF-8 with a byte order mark so Excel opens Tibetan text.</p>
+        <p>Work is saved in this browser. Refreshing the page brings it back. Reset clears that saved session and does not delete a file you already downloaded.</p>
+      </details>
+    </section>
+
+    <section id="workspace" class="workspace hidden">
+      <div id="table-wrap" class="table-wrap">
+        <table>
+          <caption class="sr-only">Sentence pairs. Source is read only. Target can be edited. Mark each row accepted, edited, or rejected.</caption>
+          <thead>
+            <tr>
+              <th class="col-num" scope="col">#</th>
+              <th class="col-text" scope="col">Source</th>
+              <th class="col-text" scope="col">Target</th>
+              <th class="col-status" scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <p id="empty-filter" class="empty-filter hidden">No rows in this filter.</p>
+      <div class="pager pager-bottom" aria-label="Pages">
+        <button type="button" data-pager="prev">Previous</button>
+        <p data-page-label>Page 1 of 1</p>
+        <button type="button" data-pager="next">Next</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p>Nothing is uploaded. Annotation stays in this browser until you download it.</p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
