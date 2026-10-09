@@ -1,9 +1,9 @@
 (() => {
   const STORAGE_KEY = "tibetan-sentence-annotation-v2";
   const LEGACY_STORAGE_KEY = "tibetan-sentence-annotation-v1";
-  const ANNOTATION_STATUSES = new Set(["pending", "accepted", "edited"]);
+  const ANNOTATION_STATUSES = new Set(["pending", "accepted"]);
   const PAGE_SIZES = [10, 20, 50];
-  const FILTERS = ["all", "pending", "accepted", "edited"];
+  const FILTERS = ["all", "pending", "accepted"];
 
   const $ = (id) => document.getElementById(id);
 
@@ -20,7 +20,6 @@
     meterFill: $("meter-fill"),
     counts: {
       accepted: $("count-accepted"),
-      edited: $("count-edited"),
       pending: $("count-pending"),
     },
     banner: $("banner"),
@@ -54,7 +53,6 @@
     activeIndex: 0,
     saveError: false,
     dirtySinceDownload: false,
-    heldIndex: null,
   };
 
   let saveTimer = 0;
@@ -78,7 +76,7 @@
 
   function priorStatus(value) {
     const status = cellString(value).trim().toLowerCase();
-    if (status === "accepted" || status === "edited") return status;
+    if (status === "accepted") return "accepted";
     return "pending";
   }
 
@@ -114,7 +112,6 @@
     const correctedTarget = split.hasCorrectedTarget ? cellString(record.corrected_target) : target;
     let status = "pending";
     if (split.hasStatus) status = priorStatus(record.status);
-    else if (correctedSource !== source || correctedTarget !== target) status = "edited";
     return { original, correctedSource, correctedTarget, status };
   }
 
@@ -170,22 +167,15 @@
 
   function visibleIndices() {
     const indices = [];
-    const { filter, rows, heldIndex } = state;
+    const { filter, rows } = state;
     for (let i = 0; i < rows.length; i += 1) {
-      if (filter === "all" || rows[i].status === filter) {
-        indices.push(i);
-        continue;
-      }
-      if (filter === "pending" && rows[i].status === "edited" && heldIndex === i) {
-        indices.push(i);
-      }
+      if (filter === "all" || rows[i].status === filter) indices.push(i);
     }
     return indices;
   }
 
   function statusLabel(status) {
     if (status === "accepted") return "Accepted";
-    if (status === "edited") return "Edited";
     return "Pending";
   }
 
@@ -194,25 +184,32 @@
       || row.correctedTarget !== (row.original.target ?? "");
   }
 
+  function locPart(text, className) {
+    const span = document.createElement("span");
+    span.className = className;
+    span.textContent = text;
+    span.title = text;
+    return span;
+  }
+
   function fillRowLoc(container, original) {
-    const pageId = cellString(original.page_id).trim();
-    const segment = cellString(original.segment_idx).trim();
-    const split = cellString(original.split).trim();
-    if (!pageId && !segment && !split) return;
+    const parts = [
+      ["page-id", cellString(original.page_id).trim()],
+      ["segment-idx", cellString(original.segment_idx).trim()],
+      ["split", cellString(original.split).trim()],
+    ].filter(([, value]) => value);
+    if (!parts.length) return;
     const loc = document.createElement("p");
     loc.className = "row-loc";
-    if (pageId) {
-      const page = document.createElement("span");
-      page.className = "page-id";
-      page.textContent = pageId;
-      page.title = pageId;
-      loc.append(page);
-    }
-    const extra = [segment, split].filter(Boolean).join(" · ");
-    if (extra) {
-      if (pageId) loc.append(document.createTextNode(" · "));
-      loc.append(document.createTextNode(extra));
-    }
+    parts.forEach(([className, value], i) => {
+      if (i) {
+        const sep = document.createElement("span");
+        sep.className = "loc-sep";
+        sep.textContent = "·";
+        loc.append(sep);
+      }
+      loc.append(locPart(value, className));
+    });
     container.append(loc);
   }
 
@@ -260,20 +257,18 @@
     group.className = "status-actions";
     group.setAttribute("role", "group");
     group.setAttribute("aria-label", `Status for row ${index + 1}`);
-    for (const [value, text] of [["accepted", "Accept"], ["edited", "Edit"]]) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.dataset.setStatus = value;
-      button.textContent = text;
-      button.setAttribute("aria-pressed", row.status === value ? "true" : "false");
-      group.append(button);
-    }
     if (row.status === "accepted") {
       const back = document.createElement("button");
       back.type = "button";
       back.dataset.movePending = "true";
       back.textContent = "Move back to pending";
       group.append(back);
+    } else {
+      const accept = document.createElement("button");
+      accept.type = "button";
+      accept.dataset.setStatus = "accepted";
+      accept.textContent = "Accept";
+      group.append(accept);
     }
     status.append(label, group);
 
@@ -349,19 +344,18 @@
   }
 
   function updateStats() {
-    const counts = { accepted: 0, edited: 0, pending: 0 };
+    const counts = { accepted: 0, pending: 0 };
     for (const row of state.rows) {
-      if (counts[row.status] != null) counts[row.status] += 1;
+      if (row.status === "accepted") counts.accepted += 1;
       else counts.pending += 1;
     }
     const total = state.rows.length;
     const current = total ? state.activeIndex + 1 : 0;
-    const reviewed = total - counts.pending;
+    const reviewed = counts.accepted;
     const pct = total ? Math.round((reviewed / total) * 100) : 0;
 
     els.rowPosition.textContent = `Row ${current} of ${total}`;
     els.counts.accepted.textContent = String(counts.accepted);
-    els.counts.edited.textContent = String(counts.edited);
     els.counts.pending.textContent = String(counts.pending);
     els.meterFill.style.width = `${pct}%`;
     els.meter.setAttribute("aria-valuenow", String(pct));
@@ -382,9 +376,6 @@
     tr.classList.toggle("is-active", index === state.activeIndex);
     const label = tr.querySelector(".status-label");
     if (label) label.textContent = statusLabel(row.status);
-    for (const button of tr.querySelectorAll("[data-set-status]")) {
-      button.setAttribute("aria-pressed", button.dataset.setStatus === row.status ? "true" : "false");
-    }
   }
 
   function setActive(index) {
@@ -399,7 +390,7 @@
   function reviewedCount(rows) {
     let done = 0;
     for (const row of rows) {
-      if (row.status === "accepted" || row.status === "edited") done += 1;
+      if (row.status === "accepted") done += 1;
     }
     return done;
   }
@@ -449,7 +440,6 @@
     row.status = "pending";
     markDirty();
     state.filter = "pending";
-    state.heldIndex = null;
     const list = visibleIndices();
     const position = list.indexOf(index);
     if (position >= 0) state.page = Math.floor(position / state.pageSize);
@@ -457,17 +447,6 @@
     renderRows();
     window.scrollTo(0, scrollY);
     flushSave();
-  }
-
-  function releaseHeldRow() {
-    const index = state.heldIndex;
-    if (index == null) return;
-    state.heldIndex = null;
-    const row = state.rows[index];
-    if (!row || row.status !== "edited" || state.filter !== "pending") return;
-    const scrollY = window.scrollY;
-    renderRows();
-    window.scrollTo(0, scrollY);
   }
 
   function leaveRow(tr, done) {
@@ -478,20 +457,10 @@
   function acceptRow(index) {
     const row = state.rows[index];
     if (!row) return;
-    if (row.status === "accepted") {
-      row.status = rowChanged(row) ? "edited" : "pending";
-      markDirty();
-      state.activeIndex = index;
-      const scrollY = window.scrollY;
-      renderRows();
-      window.scrollTo(0, scrollY);
-      flushSave();
-      return;
-    }
+    if (row.status === "accepted") return;
     const previousStatus = row.status;
     row.status = "accepted";
     markDirty();
-    state.heldIndex = null;
     state.activeIndex = index;
     showAcceptToast(index, previousStatus);
     const scrollY = window.scrollY;
@@ -510,7 +479,6 @@
     if (!row) return;
     row.status = "pending";
     markDirty();
-    state.heldIndex = null;
     state.activeIndex = index;
     const scrollY = window.scrollY;
     renderRows();
@@ -634,7 +602,6 @@
     state.page = Number.isInteger(data.page) && data.page >= 0 ? data.page : 0;
     state.pageSize = PAGE_SIZES.includes(data.pageSize) ? data.pageSize : 20;
     state.filter = "pending";
-    state.heldIndex = null;
     state.activeIndex = Number.isInteger(data.activeIndex)
       ? Math.min(Math.max(data.activeIndex, 0), data.rows.length - 1)
       : 0;
@@ -689,7 +656,6 @@
     state.activeIndex = 0;
     state.saveError = false;
     state.dirtySinceDownload = false;
-    state.heldIndex = null;
     showWorkspace();
     flushSave();
     if (parsed.notice) flash(parsed.notice);
@@ -737,15 +703,19 @@
 
   function downloadCsv() {
     if (!state.rows.length || typeof Papa === "undefined") return;
-    const pending = state.rows.filter((row) => row.status === "pending").length;
-    if (pending > 0) {
-      const noun = pending === 1 ? "row is" : "rows are";
-      const proceed = confirm(`${pending} ${noun} still pending and will be left out of the download.`);
+    const leftover = state.rows.filter((row) => row.status !== "accepted");
+    if (leftover.length) {
+      const edited = leftover.filter(rowChanged).length;
+      const leftNoun = leftover.length === 1 ? "row is" : "rows are";
+      const editNoun = edited === 1 ? "has edits" : "have edits";
+      const proceed = confirm(
+        `${leftover.length} ${leftNoun} not accepted and will be left out of the download. ${edited} of those ${editNoun}.`,
+      );
       if (!proceed) return;
     }
-    const reviewed = state.rows.filter((row) => row.status === "accepted" || row.status === "edited");
+    const reviewed = state.rows.filter((row) => row.status === "accepted");
     if (!reviewed.length) {
-      flash("Nothing to download. Accept or edit at least one row.");
+      flash("Nothing to download. Accept at least one row.");
       return;
     }
     const fields = state.headers.concat(["corrected_source", "corrected_target", "status"]);
@@ -754,7 +724,7 @@
       for (const field of state.headers) assignCell(out, field, row.original[field] ?? "");
       assignCell(out, "corrected_source", row.correctedSource);
       assignCell(out, "corrected_target", row.correctedTarget);
-      assignCell(out, "status", row.status);
+      assignCell(out, "status", "accepted");
       return out;
     });
     const csv = Papa.unparse({ fields, data }, { newline: "\r\n" });
@@ -792,7 +762,6 @@
     state.activeIndex = 0;
     state.saveError = false;
     state.dirtySinceDownload = false;
-    state.heldIndex = null;
     hideToast();
     els.tbody.replaceChildren();
     els.saveLabel.textContent = "";
@@ -859,21 +828,7 @@
   }
 
   function setStatus(index, status) {
-    const row = state.rows[index];
-    if (!row || !ANNOTATION_STATUSES.has(status) || status === "pending") return;
-    if (status === "accepted") {
-      acceptRow(index);
-      return;
-    }
-    row.status = "edited";
-    markDirty();
-    state.heldIndex = index;
-    state.activeIndex = index;
-    paintRow(index);
-    updateStats();
-    flushSave();
-    const textarea = els.tbody.querySelector(`textarea[data-index="${index}"][data-field="target"]`);
-    if (textarea) textarea.focus();
+    if (status === "accepted") acceptRow(index);
   }
 
   function onFieldInput(textarea) {
@@ -882,13 +837,16 @@
     if (!row) return;
     if (textarea.dataset.field === "source") row.correctedSource = textarea.value;
     else row.correctedTarget = textarea.value;
-    if (rowChanged(row)) row.status = "edited";
-    else if (row.status === "edited") row.status = "pending";
-    state.heldIndex = index;
     markDirty();
-    paintRow(index);
-    updateStats();
     autosize(textarea);
+    if (row.status === "accepted") {
+      row.status = "pending";
+      const scrollY = window.scrollY;
+      renderRows();
+      window.scrollTo(0, scrollY);
+      flushSave();
+      return;
+    }
     scheduleSave();
   }
 
@@ -911,7 +869,6 @@
       event.stopPropagation();
       if (!state.rows.length) return;
       state.filter = "pending";
-      state.heldIndex = null;
       const pending = [];
       for (let i = 0; i < state.rows.length; i += 1) {
         if (state.rows[i].status === "pending") pending.push(i);
@@ -950,7 +907,6 @@
 
     for (const button of document.querySelectorAll("[data-filter]")) {
       button.addEventListener("click", () => {
-        state.heldIndex = null;
         state.filter = button.dataset.filter;
         state.page = 0;
         renderRows();
@@ -968,10 +924,7 @@
       if (event.target instanceof HTMLTextAreaElement) onFieldInput(event.target);
     });
     els.tbody.addEventListener("focusin", (event) => {
-      if (!(event.target instanceof HTMLTextAreaElement)) return;
-      const index = Number(event.target.dataset.index);
-      state.heldIndex = index;
-      setActive(index);
+      if (event.target instanceof HTMLTextAreaElement) setActive(Number(event.target.dataset.index));
     });
     els.tbody.addEventListener("click", (event) => {
       const back = event.target.closest("[data-move-pending]");
@@ -985,13 +938,6 @@
       const tr = button.closest("tr");
       if (!tr) return;
       setStatus(Number(tr.dataset.index), button.dataset.setStatus);
-    });
-    document.addEventListener("pointerdown", (event) => {
-      if (state.heldIndex == null) return;
-      const tr = event.target.closest("#tbody tr");
-      if (tr && Number(tr.dataset.index) === state.heldIndex) return;
-      if (event.target.closest("#toast")) return;
-      releaseHeldRow();
     });
 
     els.dropZone.addEventListener("click", (event) => {
