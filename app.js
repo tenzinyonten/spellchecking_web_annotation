@@ -378,29 +378,38 @@
     updateStats();
   }
 
+  function pendingCount() {
+    let pending = 0;
+    for (const row of state.rows) {
+      if (row.status !== "accepted") pending += 1;
+    }
+    return pending;
+  }
+
+  function allRowsAccepted() {
+    return state.rows.length > 0 && pendingCount() === 0;
+  }
+
   function updateDownloadNote() {
     if (!els.downloadNote) return;
-    const accepted = [];
-    const pending = [];
-    for (const row of state.rows) {
-      if (row.status === "accepted") accepted.push(row);
-      else pending.push(row);
-    }
-    els.downloadBtn.disabled = accepted.length === 0;
-    if (!accepted.length) {
-      els.downloadNote.textContent = "Accept at least one row to download";
+    const total = state.rows.length;
+    const pending = pendingCount();
+    const ready = allRowsAccepted();
+    els.downloadBtn.disabled = !ready;
+    if (els.emptyDownload) els.emptyDownload.disabled = !ready;
+    els.downloadNote.classList.toggle("hidden", total === 0);
+    els.downloadNote.classList.toggle("is-link", total > 0 && !ready);
+    if (!total) {
+      els.downloadNote.textContent = "";
       return;
     }
-    const pendingEdits = pending.filter(rowChanged).length;
-    const acceptLabel = accepted.length === 1 ? "1 accepted row" : `${accepted.length} accepted rows`;
-    const pendingLabel = pending.length === 1 ? "1 pending row is not included" : `${pending.length} pending rows are not included`;
-    let text = `Downloads ${acceptLabel}. ${pendingLabel}.`;
-    if (pendingEdits) {
-      text += pendingEdits === 1
-        ? " 1 of them has edits that aren't accepted yet."
-        : ` ${pendingEdits} of them have edits that aren't accepted yet.`;
+    if (ready) {
+      const noun = total === 1 ? "row" : "rows";
+      els.downloadNote.textContent = `All ${total} ${noun} accepted. Ready to download.`;
+      return;
     }
-    els.downloadNote.textContent = text;
+    const noun = pending === 1 ? "row" : "rows";
+    els.downloadNote.textContent = `${pending} ${noun} left to accept before you can download.`;
   }
 
   function reviewedCount(rows) {
@@ -523,11 +532,8 @@
     els.stats.classList.add("hidden");
     els.toolbar.classList.add("hidden");
     els.backBtn.classList.add("hidden");
-    els.downloadBtn.disabled = true;
     els.resetBtn.disabled = state.rows.length === 0;
-    if (els.downloadNote && !state.rows.length) {
-      els.downloadNote.textContent = "Accept at least one row to download";
-    }
+    updateDownloadNote();
     els.rowPosition.textContent = "Row 0 of 0";
     document.title = "Tibetan sentence annotation";
     updateResumeButton();
@@ -734,12 +740,28 @@
     return `${cleaned || "annotation"}_annotated.csv`;
   }
 
+  function jumpToNextPending() {
+    const total = state.rows.length;
+    if (!total || allRowsAccepted()) return;
+    const start = document.body.classList.contains("has-data") ? state.activeIndex : -1;
+    for (let step = 1; step <= total; step += 1) {
+      const index = (start + step) % total;
+      if (state.rows[index].status === "pending") {
+        const filter = state.filter === "all" || state.filter === "pending" ? state.filter : "pending";
+        if (!document.body.classList.contains("has-data")) {
+          state.filter = filter;
+          showWorkspace();
+        }
+        openRow(index, { filter });
+        return;
+      }
+    }
+  }
+
   function downloadCsv() {
-    if (!state.rows.length || typeof Papa === "undefined") return;
-    const reviewed = state.rows.filter((row) => row.status === "accepted");
-    if (!reviewed.length) return;
+    if (!allRowsAccepted() || typeof Papa === "undefined") return;
     const fields = state.headers.concat(["corrected_source", "corrected_target", "status"]);
-    const data = reviewed.map((row) => {
+    const data = state.rows.map((row) => {
       const out = Object.create(null);
       for (const field of state.headers) assignCell(out, field, row.original[field] ?? "");
       assignCell(out, "corrected_source", row.correctedSource);
@@ -787,7 +809,6 @@
     els.saveLabel.textContent = "";
     els.fileLabel.textContent = "";
     hideSaveWarning();
-    if (els.downloadNote) els.downloadNote.textContent = "Accept at least one row to download";
     showEmpty();
     clearFlash();
   }
@@ -905,6 +926,7 @@
       showWorkspace();
     });
     els.downloadBtn.addEventListener("click", downloadCsv);
+    els.downloadNote.addEventListener("click", jumpToNextPending);
     els.emptyDownload.addEventListener("click", downloadCsv);
     els.toastUndo.addEventListener("click", undoAccept);
     els.resetBtn.addEventListener("click", resetSession);
