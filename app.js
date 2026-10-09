@@ -13,16 +13,7 @@
     downloadBtn: $("download-btn"),
     downloadNote: $("download-note"),
     resetBtn: $("reset-btn"),
-    fileLabel: $("file-label"),
-    saveLabel: $("save-label"),
     saveWarning: $("save-warning"),
-    rowPosition: $("row-position"),
-    meter: $("meter"),
-    meterFill: $("meter-fill"),
-    counts: {
-      accepted: $("count-accepted"),
-      pending: $("count-pending"),
-    },
     banner: $("banner"),
     dropZone: $("drop-zone"),
     workspace: $("workspace"),
@@ -36,8 +27,6 @@
     toastText: $("toast-text"),
     toastUndo: $("toast-undo"),
     toolbar: $("toolbar"),
-    sessionBar: $("session-bar"),
-    stats: $("stats"),
   };
 
   const state = {
@@ -307,28 +296,10 @@
   }
 
   function updateStats() {
-    const counts = { accepted: 0, pending: 0 };
-    for (const row of state.rows) {
-      if (row.status === "accepted") counts.accepted += 1;
-      else counts.pending += 1;
-    }
-    const total = state.rows.length;
-    const current = total ? state.activeIndex + 1 : 0;
-    const reviewed = counts.accepted;
-    const pct = total ? Math.round((reviewed / total) * 100) : 0;
-
-    els.rowPosition.textContent = `Row ${current} of ${total}`;
-    els.counts.accepted.textContent = String(counts.accepted);
-    els.counts.pending.textContent = String(counts.pending);
-    els.meterFill.style.width = `${pct}%`;
-    els.meter.setAttribute("aria-valuenow", String(pct));
-    els.meter.setAttribute("aria-valuetext", `${reviewed} of ${total} reviewed`);
-    els.resetBtn.disabled = total === 0;
+    els.resetBtn.disabled = state.rows.length === 0;
     updateDownloadNote();
     updateResumeButton();
-    document.title = total
-      ? `Row ${current} of ${total} · Tibetan annotation`
-      : "Tibetan sentence annotation";
+    document.title = "Tibetan sentence annotation";
   }
 
   function paintRow(index) {
@@ -484,11 +455,8 @@
     document.body.classList.add("has-data");
     els.dropZone.classList.add("hidden");
     els.workspace.classList.remove("hidden");
-    els.sessionBar.classList.remove("hidden");
-    els.stats.classList.remove("hidden");
     els.toolbar.classList.remove("hidden");
     els.backBtn.classList.remove("hidden");
-    els.fileLabel.textContent = `${state.filename} · ${state.rows.length} rows`;
     renderRows();
     updateResumeButton();
   }
@@ -497,13 +465,10 @@
     document.body.classList.remove("has-data");
     els.dropZone.classList.remove("hidden");
     els.workspace.classList.add("hidden");
-    els.sessionBar.classList.add("hidden");
-    els.stats.classList.add("hidden");
     els.toolbar.classList.add("hidden");
     els.backBtn.classList.add("hidden");
     els.resetBtn.disabled = state.rows.length === 0;
     updateDownloadNote();
-    els.rowPosition.textContent = "Row 0 of 0";
     document.title = "Tibetan sentence annotation";
     updateResumeButton();
   }
@@ -544,7 +509,6 @@
   function showSaveWarning() {
     state.saveError = true;
     const message = "Your progress can't be saved in this browser. Download the CSV now.";
-    els.saveLabel.textContent = message;
     if (els.saveWarning) {
       els.saveWarning.textContent = message;
       els.saveWarning.classList.remove("hidden");
@@ -562,8 +526,6 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize()));
       state.saveError = false;
       hideSaveWarning();
-      const time = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-      els.saveLabel.textContent = `Saved in this browser at ${time}`;
     } catch (error) {
       showSaveWarning();
     }
@@ -571,7 +533,6 @@
 
   function scheduleSave() {
     if (!state.rows.length) return;
-    if (!state.saveError) els.saveLabel.textContent = "Saving…";
     clearTimeout(saveTimer);
     saveTimer = setTimeout(flushSave, 300);
   }
@@ -766,8 +727,6 @@
     state.dirtySinceDownload = false;
     hideToast();
     els.tbody.replaceChildren();
-    els.saveLabel.textContent = "";
-    els.fileLabel.textContent = "";
     hideSaveWarning();
     showEmpty();
     clearFlash();
@@ -937,7 +896,6 @@
   }
   if (restore()) {
     showWorkspace();
-    els.saveLabel.textContent = "Restored the session saved in this browser.";
   } else {
     showEmpty();
   }

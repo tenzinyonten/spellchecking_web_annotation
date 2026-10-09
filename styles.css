@@ -50,6 +50,8 @@ h2 { margin-bottom: 0.4rem; font-size: 1.25rem; }
   color: var(--muted);
 }
 
+body.has-data .lede { display: none; }
+
 .site-header { padding: 1.25rem 0 0.75rem; }
 
 .tools {
@@ -71,22 +73,14 @@ body.has-data .tools {
   gap: 0.45rem;
 }
 
-.actions, .session-bar, .stats-main, .counts, .filters {
+.actions, .filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 0.75rem;
 }
 
-.session-bar, .counts { justify-content: space-between; }
-
-.session-bar {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.92rem;
-}
-
-.session-bar p { margin: 0; }
+.filters { margin-left: auto; }
 
 .download-note {
   margin: 0;
@@ -120,53 +114,6 @@ body.has-data .tools {
   font-weight: 600;
 }
 
-.row-position {
-  margin: 0;
-  min-width: 8.5rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.meter {
-  flex: 1;
-  min-width: 8rem;
-  height: 0.45rem;
-  background: #e4dacb;
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.meter span {
-  display: block;
-  height: 100%;
-  width: 0;
-  background: var(--accent);
-  transition: width 160ms ease;
-}
-
-.counts {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  justify-content: flex-start;
-}
-
-.counts strong {
-  font-variant-numeric: tabular-nums;
-}
-
-.counts li[data-count="accepted"] strong { color: var(--accept); }
-.counts li[data-count="pending"] strong { color: var(--muted); }
-
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.55rem 1rem;
-}
-
-.hint { flex: 1 1 14rem; }
-
 .filters { gap: 0.35rem; }
 
 .filters button, .status-actions button {
@@ -184,12 +131,6 @@ body.has-data .tools {
   background: var(--ink);
   border-color: var(--ink);
   color: #fff;
-}
-
-.hint {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
 }
 
 .btn {
@@ -522,7 +463,6 @@ tr.is-leaving td {
 tr, textarea.bo { scroll-margin-top: 12rem; }
 
 @media (prefers-reduced-motion: reduce) {
-  .meter span { transition: none; }
   tr.is-leaving,
   tr.is-leaving th,
   tr.is-leaving td { transition: none; }
@@ -536,21 +476,6 @@ tr.is-leaving td {
 
 @media (max-width: 860px) {
   .wrap { width: min(1440px, calc(100% - 1.25rem)); }
-
-  body.has-data .tools {
-    position: static;
-    background: transparent;
-    border-bottom: 0;
-    backdrop-filter: none;
-  }
-
-  body.has-data #stats {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    padding: 0.45rem 0;
-    background: rgba(243, 239, 230, 0.96);
-  }
 
   table, thead, tbody, tr, th, td { display: block; width: 100%; }
 
