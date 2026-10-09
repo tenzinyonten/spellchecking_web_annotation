@@ -29,6 +29,12 @@
     tableWrap: $("table-wrap"),
     tbody: $("tbody"),
     emptyFilter: $("empty-filter"),
+    emptyFilterText: $("empty-filter-text"),
+    emptyPending: $("empty-pending"),
+    emptyDownload: $("empty-download"),
+    toast: $("toast"),
+    toastText: $("toast-text"),
+    toastUndo: $("toast-undo"),
     toolbar: $("toolbar"),
     sessionBar: $("session-bar"),
     stats: $("stats"),
@@ -44,15 +50,18 @@
     rows: [],
     page: 0,
     pageSize: 20,
-    filter: "all",
+    filter: "pending",
     activeIndex: 0,
     saveError: false,
     dirtySinceDownload: false,
+    heldIndex: null,
   };
 
   let saveTimer = 0;
   let flashTimer = 0;
+  let toastTimer = 0;
   let downloadUrl = "";
+  let lastUndo = null;
 
   function assignCell(obj, key, value) {
     Object.defineProperty(obj, key, {
@@ -161,9 +170,15 @@
 
   function visibleIndices() {
     const indices = [];
-    const { filter, rows } = state;
+    const { filter, rows, heldIndex } = state;
     for (let i = 0; i < rows.length; i += 1) {
-      if (filter === "all" || rows[i].status === filter) indices.push(i);
+      if (filter === "all" || rows[i].status === filter) {
+        indices.push(i);
+        continue;
+      }
+      if (filter === "pending" && rows[i].status === "edited" && heldIndex === i) {
+        indices.push(i);
+      }
     }
     return indices;
   }
@@ -179,21 +194,26 @@
       || row.correctedTarget !== (row.original.target ?? "");
   }
 
-  function fillMeta(container, original) {
-    for (const header of state.headers) {
-      if (header === "source" || header === "target" || header === "diff_category" || !header) continue;
-      const value = original[header] ?? "";
-      if (value === "") continue;
-      const chip = document.createElement("span");
-      chip.className = "chip";
-      const key = document.createElement("span");
-      key.className = "chip-key";
-      key.textContent = header;
-      const shown = value.length > 80 ? `${value.slice(0, 77)}…` : value;
-      chip.append(key, document.createTextNode(shown));
-      if (value.length > 80) chip.title = value;
-      container.append(chip);
+  function fillRowLoc(container, original) {
+    const pageId = cellString(original.page_id).trim();
+    const segment = cellString(original.segment_idx).trim();
+    const split = cellString(original.split).trim();
+    if (!pageId && !segment && !split) return;
+    const loc = document.createElement("p");
+    loc.className = "row-loc";
+    if (pageId) {
+      const page = document.createElement("span");
+      page.className = "page-id";
+      page.textContent = pageId;
+      page.title = pageId;
+      loc.append(page);
     }
+    const extra = [segment, split].filter(Boolean).join(" · ");
+    if (extra) {
+      if (pageId) loc.append(document.createTextNode(" · "));
+      loc.append(document.createTextNode(extra));
+    }
+    container.append(loc);
   }
 
   function autosize(textarea) {
@@ -210,15 +230,14 @@
 
     const number = document.createElement("th");
     number.scope = "row";
-    number.textContent = String(index + 1);
+    const num = document.createElement("span");
+    num.textContent = String(index + 1);
+    number.append(num);
+    fillRowLoc(number, row.original);
 
     const source = document.createElement("td");
     source.className = "source";
     source.dataset.label = "Source";
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    fillMeta(meta, row.original);
-    if (meta.childNodes.length) source.append(meta);
     source.append(makeTextarea(index, "source", row.correctedSource));
 
     const target = document.createElement("td");
@@ -248,6 +267,13 @@
       button.textContent = text;
       button.setAttribute("aria-pressed", row.status === value ? "true" : "false");
       group.append(button);
+    }
+    if (row.status === "accepted") {
+      const back = document.createElement("button");
+      back.type = "button";
+      back.dataset.movePending = "true";
+      back.textContent = "Move back to pending";
+      group.append(back);
     }
     status.append(label, group);
 
@@ -289,7 +315,11 @@
     els.tbody.replaceChildren(fragment);
 
     const filteredOut = list.length === 0;
+    const pendingDone = filteredOut && state.filter === "pending" && state.rows.length > 0;
     els.emptyFilter.classList.toggle("hidden", !filteredOut);
+    els.emptyFilterText.classList.toggle("hidden", pendingDone);
+    els.emptyPending.classList.toggle("hidden", !pendingDone);
+    if (!pendingDone) els.emptyFilterText.textContent = "No rows in this filter.";
     els.tableWrap.classList.toggle("hidden", filteredOut);
 
     const from = list.length ? start + 1 : 0;
@@ -390,6 +420,102 @@
 
   function markDirty() {
     state.dirtySinceDownload = true;
+  }
+
+  function prefersReducedMotion() {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  function hideToast() {
+    clearTimeout(toastTimer);
+    els.toast.classList.add("hidden");
+    lastUndo = null;
+  }
+
+  function showAcceptToast(index, previousStatus) {
+    lastUndo = { index, previousStatus };
+    els.toastText.textContent = `Row ${index + 1} accepted.`;
+    els.toast.classList.remove("hidden");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 6000);
+  }
+
+  function undoAccept() {
+    if (!lastUndo) return;
+    const { index, previousStatus } = lastUndo;
+    const row = state.rows[index];
+    hideToast();
+    if (!row) return;
+    row.status = "pending";
+    markDirty();
+    state.filter = "pending";
+    state.heldIndex = null;
+    const list = visibleIndices();
+    const position = list.indexOf(index);
+    if (position >= 0) state.page = Math.floor(position / state.pageSize);
+    const scrollY = window.scrollY;
+    renderRows();
+    window.scrollTo(0, scrollY);
+    flushSave();
+  }
+
+  function releaseHeldRow() {
+    const index = state.heldIndex;
+    if (index == null) return;
+    state.heldIndex = null;
+    const row = state.rows[index];
+    if (!row || row.status !== "edited" || state.filter !== "pending") return;
+    const scrollY = window.scrollY;
+    renderRows();
+    window.scrollTo(0, scrollY);
+  }
+
+  function leaveRow(tr, done) {
+    tr.classList.add("is-leaving");
+    window.setTimeout(done, prefersReducedMotion() ? 0 : 200);
+  }
+
+  function acceptRow(index) {
+    const row = state.rows[index];
+    if (!row) return;
+    if (row.status === "accepted") {
+      row.status = rowChanged(row) ? "edited" : "pending";
+      markDirty();
+      state.activeIndex = index;
+      const scrollY = window.scrollY;
+      renderRows();
+      window.scrollTo(0, scrollY);
+      flushSave();
+      return;
+    }
+    const previousStatus = row.status;
+    row.status = "accepted";
+    markDirty();
+    state.heldIndex = null;
+    state.activeIndex = index;
+    showAcceptToast(index, previousStatus);
+    const scrollY = window.scrollY;
+    const tr = els.tbody.querySelector(`tr[data-index="${index}"]`);
+    const finish = () => {
+      renderRows();
+      window.scrollTo(0, scrollY);
+      flushSave();
+    };
+    if (state.filter === "pending" && tr) leaveRow(tr, finish);
+    else finish();
+  }
+
+  function moveBackToPending(index) {
+    const row = state.rows[index];
+    if (!row) return;
+    row.status = "pending";
+    markDirty();
+    state.heldIndex = null;
+    state.activeIndex = index;
+    const scrollY = window.scrollY;
+    renderRows();
+    window.scrollTo(0, scrollY);
+    flushSave();
   }
 
   function showWorkspace() {
@@ -507,10 +633,21 @@
     state.rows = data.rows.map(rowFromSaved);
     state.page = Number.isInteger(data.page) && data.page >= 0 ? data.page : 0;
     state.pageSize = PAGE_SIZES.includes(data.pageSize) ? data.pageSize : 20;
-    state.filter = FILTERS.includes(data.filter) ? data.filter : "all";
+    state.filter = "pending";
+    state.heldIndex = null;
     state.activeIndex = Number.isInteger(data.activeIndex)
       ? Math.min(Math.max(data.activeIndex, 0), data.rows.length - 1)
       : 0;
+    const pending = [];
+    for (let i = 0; i < state.rows.length; i += 1) {
+      if (state.rows[i].status === "pending") pending.push(i);
+    }
+    if (pending.includes(state.activeIndex)) {
+      state.page = Math.floor(pending.indexOf(state.activeIndex) / state.pageSize);
+    } else {
+      state.page = 0;
+      if (pending.length) state.activeIndex = pending[0];
+    }
     if (typeof data.dirtySinceDownload === "boolean") {
       state.dirtySinceDownload = data.dirtySinceDownload;
     } else {
@@ -548,10 +685,11 @@
     state.headers = parsed.headers;
     state.rows = parsed.rows;
     state.page = 0;
-    state.filter = "all";
+    state.filter = "pending";
     state.activeIndex = 0;
     state.saveError = false;
     state.dirtySinceDownload = false;
+    state.heldIndex = null;
     showWorkspace();
     flushSave();
     if (parsed.notice) flash(parsed.notice);
@@ -650,10 +788,12 @@
     state.headers = [];
     state.rows = [];
     state.page = 0;
-    state.filter = "all";
+    state.filter = "pending";
     state.activeIndex = 0;
     state.saveError = false;
     state.dirtySinceDownload = false;
+    state.heldIndex = null;
+    hideToast();
     els.tbody.replaceChildren();
     els.saveLabel.textContent = "";
     els.fileLabel.textContent = "";
@@ -721,27 +861,19 @@
   function setStatus(index, status) {
     const row = state.rows[index];
     if (!row || !ANNOTATION_STATUSES.has(status) || status === "pending") return;
-    if (status === "accepted" && row.status === status) {
-      row.status = rowChanged(row) ? "edited" : "pending";
-    } else {
-      row.status = status;
+    if (status === "accepted") {
+      acceptRow(index);
+      return;
     }
+    row.status = "edited";
     markDirty();
+    state.heldIndex = index;
     state.activeIndex = index;
-    const visible = state.filter === "all" || state.filter === row.status;
-    if (!visible) renderRows();
-    else {
-      paintRow(index);
-      for (const tr of els.tbody.querySelectorAll("tr")) {
-        tr.classList.toggle("is-active", Number(tr.dataset.index) === index);
-      }
-      updateStats();
-    }
+    paintRow(index);
+    updateStats();
     flushSave();
-    if (status === "edited") {
-      const textarea = els.tbody.querySelector(`textarea[data-index="${index}"][data-field="target"]`);
-      if (textarea) textarea.focus();
-    }
+    const textarea = els.tbody.querySelector(`textarea[data-index="${index}"][data-field="target"]`);
+    if (textarea) textarea.focus();
   }
 
   function onFieldInput(textarea) {
@@ -752,6 +884,7 @@
     else row.correctedTarget = textarea.value;
     if (rowChanged(row)) row.status = "edited";
     else if (row.status === "edited") row.status = "pending";
+    state.heldIndex = index;
     markDirty();
     paintRow(index);
     updateStats();
@@ -776,9 +909,24 @@
     els.resumeBtn.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      if (state.rows.length) showWorkspace();
+      if (!state.rows.length) return;
+      state.filter = "pending";
+      state.heldIndex = null;
+      const pending = [];
+      for (let i = 0; i < state.rows.length; i += 1) {
+        if (state.rows[i].status === "pending") pending.push(i);
+      }
+      if (pending.includes(state.activeIndex)) {
+        state.page = Math.floor(pending.indexOf(state.activeIndex) / state.pageSize);
+      } else {
+        state.page = 0;
+        if (pending.length) state.activeIndex = pending[0];
+      }
+      showWorkspace();
     });
     els.downloadBtn.addEventListener("click", downloadCsv);
+    els.emptyDownload.addEventListener("click", downloadCsv);
+    els.toastUndo.addEventListener("click", undoAccept);
     els.resetBtn.addEventListener("click", resetSession);
     els.nextPending.addEventListener("click", nextPending);
     els.gotoBtn.addEventListener("click", goToRow);
@@ -802,6 +950,7 @@
 
     for (const button of document.querySelectorAll("[data-filter]")) {
       button.addEventListener("click", () => {
+        state.heldIndex = null;
         state.filter = button.dataset.filter;
         state.page = 0;
         renderRows();
@@ -819,14 +968,30 @@
       if (event.target instanceof HTMLTextAreaElement) onFieldInput(event.target);
     });
     els.tbody.addEventListener("focusin", (event) => {
-      if (event.target instanceof HTMLTextAreaElement) setActive(Number(event.target.dataset.index));
+      if (!(event.target instanceof HTMLTextAreaElement)) return;
+      const index = Number(event.target.dataset.index);
+      state.heldIndex = index;
+      setActive(index);
     });
     els.tbody.addEventListener("click", (event) => {
+      const back = event.target.closest("[data-move-pending]");
+      if (back) {
+        const tr = back.closest("tr");
+        if (tr) moveBackToPending(Number(tr.dataset.index));
+        return;
+      }
       const button = event.target.closest("[data-set-status]");
       if (!button) return;
       const tr = button.closest("tr");
       if (!tr) return;
       setStatus(Number(tr.dataset.index), button.dataset.setStatus);
+    });
+    document.addEventListener("pointerdown", (event) => {
+      if (state.heldIndex == null) return;
+      const tr = event.target.closest("#tbody tr");
+      if (tr && Number(tr.dataset.index) === state.heldIndex) return;
+      if (event.target.closest("#toast")) return;
+      releaseHeldRow();
     });
 
     els.dropZone.addEventListener("click", (event) => {

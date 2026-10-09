@@ -54,8 +54,8 @@
 
       <div id="toolbar" class="toolbar hidden">
         <div class="filters" role="group" aria-label="Filter rows">
-          <button type="button" data-filter="all" aria-pressed="true">All</button>
-          <button type="button" data-filter="pending">Pending</button>
+          <button type="button" data-filter="all" aria-pressed="false">All</button>
+          <button type="button" data-filter="pending" aria-pressed="true">Pending</button>
           <button type="button" data-filter="accepted">Accepted</button>
           <button type="button" data-filter="edited">Edited</button>
         </div>
@@ -117,7 +117,13 @@
           <tbody id="tbody"></tbody>
         </table>
       </div>
-      <p id="empty-filter" class="empty-filter hidden">No rows in this filter.</p>
+      <div id="empty-filter" class="empty-filter hidden">
+        <p id="empty-filter-text">No rows in this filter.</p>
+        <div id="empty-pending" class="empty-pending hidden">
+          <p>All rows reviewed.</p>
+          <button id="empty-download" class="btn primary" type="button">Download CSV</button>
+        </div>
+      </div>
       <div class="pager pager-bottom" aria-label="Pages">
         <button type="button" data-pager="prev">Previous</button>
         <p data-page-label>Page 1 of 1</p>
@@ -125,6 +131,11 @@
       </div>
     </section>
   </main>
+
+  <div id="toast" class="toast hidden" role="status">
+    <span id="toast-text"></span>
+    <button id="toast-undo" type="button">Undo</button>
+  </div>
 
   <footer class="wrap footer">
     <p>Nothing is uploaded. Annotation stays in this browser until you download it.</p>
