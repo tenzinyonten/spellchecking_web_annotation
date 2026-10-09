@@ -9,6 +9,8 @@
 
   const els = {
     fileInput: $("file-input"),
+    backBtn: $("back-btn"),
+    resumeBtn: $("resume-btn"),
     downloadBtn: $("download-btn"),
     resetBtn: $("reset-btn"),
     fileLabel: $("file-label"),
@@ -45,6 +47,7 @@
     filter: "all",
     activeIndex: 0,
     saveError: false,
+    dirtySinceDownload: false,
   };
 
   let saveTimer = 0;
@@ -335,6 +338,7 @@
     els.meter.setAttribute("aria-valuetext", `${reviewed} of ${total} reviewed`);
     els.downloadBtn.disabled = total === 0;
     els.resetBtn.disabled = total === 0;
+    updateResumeButton();
     document.title = total
       ? `Row ${current} of ${total} · Tibetan annotation`
       : "Tibetan sentence annotation";
@@ -362,6 +366,32 @@
     updateStats();
   }
 
+  function reviewedCount(rows) {
+    let done = 0;
+    for (const row of rows) {
+      if (row.status === "accepted" || row.status === "edited") done += 1;
+    }
+    return done;
+  }
+
+  function updateResumeButton() {
+    const total = state.rows.length;
+    if (!els.resumeBtn) return;
+    if (!total) {
+      els.resumeBtn.classList.add("hidden");
+      els.resumeBtn.textContent = "Resume last batch";
+      return;
+    }
+    const done = reviewedCount(state.rows);
+    els.resumeBtn.textContent = `Resume last batch (${total} rows, ${done} done)`;
+    const onUpload = !document.body.classList.contains("has-data");
+    els.resumeBtn.classList.toggle("hidden", !onUpload);
+  }
+
+  function markDirty() {
+    state.dirtySinceDownload = true;
+  }
+
   function showWorkspace() {
     document.body.classList.add("has-data");
     els.dropZone.classList.add("hidden");
@@ -369,8 +399,10 @@
     els.sessionBar.classList.remove("hidden");
     els.stats.classList.remove("hidden");
     els.toolbar.classList.remove("hidden");
+    els.backBtn.classList.remove("hidden");
     els.fileLabel.textContent = `${state.filename} · ${state.rows.length} rows`;
     renderRows();
+    updateResumeButton();
   }
 
   function showEmpty() {
@@ -380,10 +412,25 @@
     els.sessionBar.classList.add("hidden");
     els.stats.classList.add("hidden");
     els.toolbar.classList.add("hidden");
+    els.backBtn.classList.add("hidden");
     els.downloadBtn.disabled = true;
-    els.resetBtn.disabled = true;
+    els.resetBtn.disabled = state.rows.length === 0;
     els.rowPosition.textContent = "Row 0 of 0";
     document.title = "Tibetan sentence annotation";
+    updateResumeButton();
+  }
+
+  function goBack() {
+    if (!state.rows.length) {
+      showEmpty();
+      return;
+    }
+    flushSave();
+    if (state.dirtySinceDownload && reviewedCount(state.rows) > 0) {
+      const ok = confirm("You have changes that haven't been downloaded. Go back anyway? Your work stays saved in this browser.");
+      if (!ok) return;
+    }
+    showEmpty();
   }
 
   function serialize() {
@@ -401,6 +448,7 @@
       pageSize: state.pageSize,
       filter: state.filter,
       activeIndex: state.activeIndex,
+      dirtySinceDownload: state.dirtySinceDownload,
       savedAt: new Date().toISOString(),
     };
   }
@@ -463,6 +511,11 @@
     state.activeIndex = Number.isInteger(data.activeIndex)
       ? Math.min(Math.max(data.activeIndex, 0), data.rows.length - 1)
       : 0;
+    if (typeof data.dirtySinceDownload === "boolean") {
+      state.dirtySinceDownload = data.dirtySinceDownload;
+    } else {
+      state.dirtySinceDownload = reviewedCount(state.rows) > 0;
+    }
   }
 
   function readStorage(key) {
@@ -498,6 +551,7 @@
     state.filter = "all";
     state.activeIndex = 0;
     state.saveError = false;
+    state.dirtySinceDownload = false;
     showWorkspace();
     flushSave();
     if (parsed.notice) flash(parsed.notice);
@@ -526,7 +580,7 @@
           return;
         }
         if (state.rows.length) {
-          const replace = confirm("Replace the current session? Annotation progress saved only in this browser will be replaced.");
+          const replace = confirm("Replace your saved batch? Download it first if you need it.");
           if (!replace) return;
         }
         commitParsed(file.name, parsed);
@@ -575,6 +629,8 @@
     document.body.append(link);
     link.click();
     link.remove();
+    state.dirtySinceDownload = false;
+    flushSave();
     const url = downloadUrl;
     setTimeout(() => {
       if (downloadUrl === url) {
@@ -597,6 +653,7 @@
     state.filter = "all";
     state.activeIndex = 0;
     state.saveError = false;
+    state.dirtySinceDownload = false;
     els.tbody.replaceChildren();
     els.saveLabel.textContent = "";
     els.fileLabel.textContent = "";
@@ -669,6 +726,7 @@
     } else {
       row.status = status;
     }
+    markDirty();
     state.activeIndex = index;
     const visible = state.filter === "all" || state.filter === row.status;
     if (!visible) renderRows();
@@ -694,6 +752,7 @@
     else row.correctedTarget = textarea.value;
     if (rowChanged(row)) row.status = "edited";
     else if (row.status === "edited") row.status = "pending";
+    markDirty();
     paintRow(index);
     updateStats();
     autosize(textarea);
@@ -713,6 +772,12 @@
       if (file) takeFile(file);
     });
 
+    els.backBtn.addEventListener("click", goBack);
+    els.resumeBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (state.rows.length) showWorkspace();
+    });
     els.downloadBtn.addEventListener("click", downloadCsv);
     els.resetBtn.addEventListener("click", resetSession);
     els.nextPending.addEventListener("click", nextPending);

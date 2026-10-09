@@ -21,6 +21,12 @@
   <div id="tools" class="tools">
     <div class="wrap tools-inner">
       <div class="actions">
+        <button id="back-btn" class="btn hidden" type="button">
+          <svg class="back-arrow" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M9.78 2.72a.75.75 0 0 1 0 1.06L5.56 8l4.22 4.22a.75.75 0 1 1-1.06 1.06l-4.75-4.75a.75.75 0 0 1 0-1.06l4.75-4.75a.75.75 0 0 1 1.06 0z"/>
+          </svg>
+          Back
+        </button>
         <label class="btn primary" for="file-input">Upload CSV</label>
         <input id="file-input" class="sr-only" type="file" accept=".csv,text/csv">
         <button id="download-btn" class="btn" type="button" disabled>Download CSV</button>
@@ -85,6 +91,9 @@
     <section id="drop-zone" class="drop-zone" tabindex="0" aria-label="Upload CSV. Activate to choose a file, or drop a file here.">
       <h2>Drop a CSV here</h2>
       <p>The header row must include <code>source</code> and <code>target</code>. Other columns, such as <code>diff_category</code>, <code>page_id</code>, and <code>segment_idx</code>, stay in the file you download.</p>
+      <p class="resume-wrap">
+        <button id="resume-btn" class="btn primary hidden" type="button">Resume last batch</button>
+      </p>
       <details>
         <summary>What the download contains</summary>
         <p>Every original column is copied unchanged, then <code>corrected_source</code>, <code>corrected_target</code>, and <code>status</code> are added. Status is <code>accepted</code> or <code>edited</code>. Pending rows are left out. The file is UTF-8 with a byte order mark so Excel opens Tibetan text.</p>

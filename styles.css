@@ -203,6 +203,19 @@ input[type="number"] { width: 5.2rem; }
 
 .btn.small { padding: 0.35rem 0.7rem; font-size: 0.9rem; font-weight: 600; }
 
+.btn .back-arrow {
+  width: 1em;
+  height: 1em;
+  margin-right: 0.25rem;
+  flex-shrink: 0;
+}
+
+.resume-wrap {
+  margin: 1rem 0 0;
+}
+
+.resume-wrap .btn { cursor: pointer; }
+
 .btn.primary {
   background: var(--accent);
   border-color: var(--accent);
