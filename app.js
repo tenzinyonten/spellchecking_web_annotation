@@ -184,33 +184,17 @@
       || row.correctedTarget !== (row.original.target ?? "");
   }
 
-  function locPart(text, className) {
-    const span = document.createElement("span");
-    span.className = className;
-    span.textContent = text;
-    span.title = text;
-    return span;
-  }
-
-  function fillRowLoc(container, original) {
-    const parts = [
-      ["page-id", cellString(original.page_id).trim()],
-      ["segment-idx", cellString(original.segment_idx).trim()],
-      ["split", cellString(original.split).trim()],
-    ].filter(([, value]) => value);
-    if (!parts.length) return;
+  function fillRowLoc(original) {
+    const parts = [];
+    for (const key of ["page_id", "segment_idx", "split"]) {
+      const value = cellString(original[key]).trim();
+      if (value) parts.push(`${key} ${value}`);
+    }
+    if (!parts.length) return null;
     const loc = document.createElement("p");
     loc.className = "row-loc";
-    parts.forEach(([className, value], i) => {
-      if (i) {
-        const sep = document.createElement("span");
-        sep.className = "loc-sep";
-        sep.textContent = "·";
-        loc.append(sep);
-      }
-      loc.append(locPart(value, className));
-    });
-    container.append(loc);
+    loc.textContent = parts.join(" · ");
+    return loc;
   }
 
   function autosize(textarea) {
@@ -227,20 +211,25 @@
 
     const number = document.createElement("th");
     number.scope = "row";
-    const num = document.createElement("span");
-    num.textContent = String(index + 1);
-    number.append(num);
-    fillRowLoc(number, row.original);
+    number.textContent = String(index + 1);
 
-    const source = document.createElement("td");
+    const texts = document.createElement("td");
+    texts.className = "texts";
+    texts.colSpan = 2;
+    const pair = document.createElement("div");
+    pair.className = "text-pair";
+    const source = document.createElement("div");
     source.className = "source";
     source.dataset.label = "Source";
     source.append(makeTextarea(index, "source", row.correctedSource));
-
-    const target = document.createElement("td");
+    const target = document.createElement("div");
     target.className = "target";
     target.dataset.label = "Target";
     target.append(makeTextarea(index, "target", row.correctedTarget));
+    pair.append(source, target);
+    texts.append(pair);
+    const loc = fillRowLoc(row.original);
+    if (loc) texts.append(loc);
 
     const category = document.createElement("td");
     category.className = "category";
@@ -272,7 +261,7 @@
     }
     status.append(label, group);
 
-    tr.append(number, source, target, category, status);
+    tr.append(number, texts, category, status);
     return tr;
   }
 
@@ -703,28 +692,13 @@
 
   function downloadCsv() {
     if (!state.rows.length || typeof Papa === "undefined") return;
-    const leftover = state.rows.filter((row) => row.status !== "accepted");
-    if (leftover.length) {
-      const edited = leftover.filter(rowChanged).length;
-      const leftNoun = leftover.length === 1 ? "row is" : "rows are";
-      const editNoun = edited === 1 ? "has edits" : "have edits";
-      const proceed = confirm(
-        `${leftover.length} ${leftNoun} not accepted and will be left out of the download. ${edited} of those ${editNoun}.`,
-      );
-      if (!proceed) return;
-    }
-    const reviewed = state.rows.filter((row) => row.status === "accepted");
-    if (!reviewed.length) {
-      flash("Nothing to download. Accept at least one row.");
-      return;
-    }
     const fields = state.headers.concat(["corrected_source", "corrected_target", "status"]);
-    const data = reviewed.map((row) => {
+    const data = state.rows.map((row) => {
       const out = Object.create(null);
       for (const field of state.headers) assignCell(out, field, row.original[field] ?? "");
       assignCell(out, "corrected_source", row.correctedSource);
       assignCell(out, "corrected_target", row.correctedTarget);
-      assignCell(out, "status", "accepted");
+      assignCell(out, "status", row.status === "accepted" ? "accepted" : "pending");
       return out;
     });
     const csv = Papa.unparse({ fields, data }, { newline: "\r\n" });

@@ -299,9 +299,9 @@ thead th {
   color: var(--muted);
 }
 
-.col-num { width: 5.75rem; }
+.col-num { width: 3.5rem; }
 .col-cat { width: 12rem; }
-.col-text { width: calc((100% - 29.75rem) / 2); }
+.col-text { width: calc((100% - 27.5rem) / 2); }
 .col-status { width: 12rem; }
 
 tbody th, tbody td {
@@ -319,7 +319,6 @@ tbody th {
   border-radius: 12px 0 0 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  overflow: hidden;
 }
 
 tbody td:last-child {
@@ -362,6 +361,13 @@ textarea.bo {
   color: var(--ink);
   overflow: auto;
   max-height: 24rem;
+}
+
+.text-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  min-width: 0;
 }
 
 .category {
@@ -436,32 +442,15 @@ tr[data-status="accepted"] .status-label { color: var(--accept); }
 }
 
 .row-loc {
-  display: flex;
-  align-items: baseline;
-  gap: 0.2rem;
-  margin: 0.3rem 0 0;
-  max-width: 100%;
-  min-width: 0;
+  margin: 0.4rem 0 0;
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 400;
-  line-height: 1.35;
+  line-height: 1.4;
   text-transform: none;
   letter-spacing: 0;
-  overflow: hidden;
-}
-
-.row-loc span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.row-loc .loc-sep {
-  flex: 0 0 auto;
-  overflow: visible;
-  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 tr.is-leaving {
@@ -589,8 +578,26 @@ tr.is-leaving td {
     color: var(--muted);
   }
 
+  tbody td.texts::before { display: none; }
+
+  .text-pair { display: block; }
+
+  .source::before,
+  .target::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.3rem;
+    font-family: system-ui, sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .target { margin-top: 0.65rem; }
+
   .status-actions { flex-direction: row; }
   .status-actions button { width: auto; flex: 1; }
-  .row-loc { max-width: 100%; }
   .pager p { min-width: 0; }
 }
