@@ -15,7 +15,7 @@
 <body>
   <header class="wrap site-header">
     <h1>Tibetan sentence annotation</h1>
-    <p class="lede">Upload a CSV of sentence pairs. Source stays fixed; correct the target, then accept, edit, or reject each row.</p>
+    <p class="lede">Upload a CSV of sentence pairs. Correct the source or the target, then accept or edit each row.</p>
   </header>
 
   <div id="tools" class="tools">
@@ -42,7 +42,6 @@
         <ul class="counts">
           <li data-count="accepted">Accepted <strong id="count-accepted">0</strong></li>
           <li data-count="edited">Edited <strong id="count-edited">0</strong></li>
-          <li data-count="rejected">Rejected <strong id="count-rejected">0</strong></li>
           <li data-count="pending">Pending <strong id="count-pending">0</strong></li>
         </ul>
       </div>
@@ -53,9 +52,8 @@
           <button type="button" data-filter="pending">Pending</button>
           <button type="button" data-filter="accepted">Accepted</button>
           <button type="button" data-filter="edited">Edited</button>
-          <button type="button" data-filter="rejected">Rejected</button>
         </div>
-        <p class="hint">Editing the target marks the row as edited.</p>
+        <p class="hint">Editing the source or the target marks the row as edited.</p>
         <div class="toolbar-controls">
           <button id="next-pending" class="btn small" type="button">Next pending</button>
           <div class="control">
@@ -89,7 +87,7 @@
       <p>The header row must include <code>source</code> and <code>target</code>. Other columns, such as <code>diff_category</code>, <code>page_id</code>, and <code>segment_idx</code>, stay in the file you download.</p>
       <details>
         <summary>What the download contains</summary>
-        <p>Every original column, plus <code>corrected_target</code> and <code>status</code>. Status is <code>pending</code>, <code>accepted</code>, <code>edited</code>, or <code>rejected</code>. The file is UTF-8 with a byte order mark so Excel opens Tibetan text.</p>
+        <p>Every original column is copied unchanged, then <code>corrected_source</code>, <code>corrected_target</code>, and <code>status</code> are added. Status is <code>accepted</code> or <code>edited</code>. Pending rows are left out. The file is UTF-8 with a byte order mark so Excel opens Tibetan text.</p>
         <p>Work is saved in this browser. Refreshing the page brings it back. Reset clears that saved session and does not delete a file you already downloaded.</p>
       </details>
     </section>
@@ -97,12 +95,13 @@
     <section id="workspace" class="workspace hidden">
       <div id="table-wrap" class="table-wrap">
         <table>
-          <caption class="sr-only">Sentence pairs. Source is read only. Target can be edited. Mark each row accepted, edited, or rejected.</caption>
+          <caption class="sr-only">Sentence pairs. Source and target can be edited. Category is read only. Mark each row accepted or edited.</caption>
           <thead>
             <tr>
               <th class="col-num" scope="col">#</th>
               <th class="col-text" scope="col">Source</th>
               <th class="col-text" scope="col">Target</th>
+              <th class="col-cat" scope="col">Category</th>
               <th class="col-status" scope="col">Status</th>
             </tr>
           </thead>

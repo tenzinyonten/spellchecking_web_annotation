@@ -1,8 +1,9 @@
 (() => {
-  const STORAGE_KEY = "tibetan-sentence-annotation-v1";
-  const ANNOTATION_STATUSES = new Set(["pending", "accepted", "edited", "rejected"]);
+  const STORAGE_KEY = "tibetan-sentence-annotation-v2";
+  const LEGACY_STORAGE_KEY = "tibetan-sentence-annotation-v1";
+  const ANNOTATION_STATUSES = new Set(["pending", "accepted", "edited"]);
   const PAGE_SIZES = [10, 20, 50];
-  const FILTERS = ["all", "pending", "accepted", "edited", "rejected"];
+  const FILTERS = ["all", "pending", "accepted", "edited"];
 
   const $ = (id) => document.getElementById(id);
 
@@ -18,7 +19,6 @@
     counts: {
       accepted: $("count-accepted"),
       edited: $("count-edited"),
-      rejected: $("count-rejected"),
       pending: $("count-pending"),
     },
     banner: $("banner"),
@@ -64,63 +64,46 @@
     return value == null ? "" : String(value);
   }
 
-  function statusIsAnnotation(records) {
+  function priorStatus(value) {
+    const status = cellString(value).trim().toLowerCase();
+    if (status === "accepted" || status === "edited") return status;
+    return "pending";
+  }
+
+  function statusColumnIsAnnotation(records) {
     return records.every((record) => {
       const value = cellString(record.status).trim().toLowerCase();
-      return value === "" || ANNOTATION_STATUSES.has(value);
+      return value === "" || value === "pending" || value === "accepted" || value === "edited" || value === "rejected";
     });
   }
 
-  function unusedName(fields, candidates) {
-    const used = new Set(fields);
-    for (const name of candidates) {
-      if (!used.has(name)) return name;
-    }
-    let i = 2;
-    while (used.has(`status_original_${i}`)) i += 1;
-    return `status_original_${i}`;
-  }
-
-  // corrected_target and status belong to this review. A status column with
-  // any other values is renamed so those values are still downloaded.
+  // Annotation columns are restored into the editor and appended again on
+  // download. Every other input column, including source and target, is kept.
   function splitColumns(fields, records) {
-    const hasCorrected = fields.includes("corrected_target");
-    const hasStatus = fields.includes("status");
-    const ours = hasStatus && statusIsAnnotation(records);
-    const statusRename = hasStatus && !ours
-      ? unusedName(fields.filter((field) => field !== "status"), ["source_status", "status_original"])
-      : null;
-
-    const headers = [];
-    for (const field of fields) {
-      if (field === "corrected_target") continue;
-      if (field === "status" && ours) continue;
-      if (field === "status" && statusRename) {
-        headers.push(statusRename);
-        continue;
-      }
-      headers.push(field);
-    }
-
-    return { headers, hasCorrected, ours, statusRename };
+    const hasCorrectedSource = fields.includes("corrected_source");
+    const hasCorrectedTarget = fields.includes("corrected_target");
+    const hasStatus = fields.includes("status")
+      && statusColumnIsAnnotation(records)
+      && (hasCorrectedSource || hasCorrectedTarget);
+    const headers = fields.filter((field) => {
+      if (field === "corrected_source" || field === "corrected_target") return false;
+      if (field === "status" && hasStatus) return false;
+      return true;
+    });
+    return { headers, hasCorrectedSource, hasCorrectedTarget, hasStatus };
   }
 
   function buildRow(record, split) {
     const original = Object.create(null);
-    for (const header of split.headers) {
-      const raw = header === split.statusRename ? record.status : record[header];
-      assignCell(original, header, cellString(raw));
-    }
+    for (const header of split.headers) assignCell(original, header, cellString(record[header]));
+    const source = original.source ?? "";
     const target = original.target ?? "";
-    const corrected = split.hasCorrected ? cellString(record.corrected_target) : target;
+    const correctedSource = split.hasCorrectedSource ? cellString(record.corrected_source) : source;
+    const correctedTarget = split.hasCorrectedTarget ? cellString(record.corrected_target) : target;
     let status = "pending";
-    if (split.ours) {
-      const raw = cellString(record.status).trim().toLowerCase();
-      if (ANNOTATION_STATUSES.has(raw)) status = raw;
-    } else if (corrected !== target) {
-      status = "edited";
-    }
-    return { original, corrected, status };
+    if (split.hasStatus) status = priorStatus(record.status);
+    else if (correctedSource !== source || correctedTarget !== target) status = "edited";
+    return { original, correctedSource, correctedTarget, status };
   }
 
   function tryBuild(results) {
@@ -143,9 +126,6 @@
 
     const split = splitColumns(fields, records);
     const notices = [];
-    if (split.statusRename) {
-      notices.push(`Kept the existing status column as ${split.statusRename}. Review decisions use status.`);
-    }
     if (results.errors && results.errors.length) {
       notices.push(`CSV warning: ${results.errors[0].message}.`);
     }
@@ -188,29 +168,17 @@
   function statusLabel(status) {
     if (status === "accepted") return "Accepted";
     if (status === "edited") return "Edited";
-    if (status === "rejected") return "Rejected";
     return "Pending";
   }
 
-  function appendWrapped(parent, text) {
-    let buffer = "";
-    for (const ch of String(text)) {
-      buffer += ch;
-      if (ch === "་" || ch === "།") {
-        parent.append(buffer);
-        parent.append(document.createElement("wbr"));
-        buffer = "";
-      } else if (ch === "\n") {
-        parent.append(buffer);
-        buffer = "";
-      }
-    }
-    if (buffer) parent.append(buffer);
+  function rowChanged(row) {
+    return row.correctedSource !== (row.original.source ?? "")
+      || row.correctedTarget !== (row.original.target ?? "");
   }
 
   function fillMeta(container, original) {
     for (const header of state.headers) {
-      if (header === "source" || header === "target" || !header) continue;
+      if (header === "source" || header === "target" || header === "diff_category" || !header) continue;
       const value = original[header] ?? "";
       if (value === "") continue;
       const chip = document.createElement("span");
@@ -247,19 +215,44 @@
     const meta = document.createElement("div");
     meta.className = "meta";
     fillMeta(meta, row.original);
-    const sourceText = document.createElement("div");
-    sourceText.className = "bo source-text";
-    sourceText.lang = "bo";
-    sourceText.dir = "ltr";
-    sourceText.translate = false;
-    sourceText.setAttribute("translate", "no");
-    appendWrapped(sourceText, row.original.source ?? "");
     if (meta.childNodes.length) source.append(meta);
-    source.append(sourceText);
+    source.append(makeTextarea(index, "source", row.correctedSource));
 
     const target = document.createElement("td");
     target.className = "target";
     target.dataset.label = "Target";
+    target.append(makeTextarea(index, "target", row.correctedTarget));
+
+    const category = document.createElement("td");
+    category.className = "category";
+    category.dataset.label = "Category";
+    category.textContent = row.original.diff_category ?? "";
+
+    const status = document.createElement("td");
+    status.className = "status";
+    status.dataset.label = "Status";
+    const label = document.createElement("p");
+    label.className = "status-label";
+    label.textContent = statusLabel(row.status);
+    const group = document.createElement("div");
+    group.className = "status-actions";
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", `Status for row ${index + 1}`);
+    for (const [value, text] of [["accepted", "Accept"], ["edited", "Edit"]]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.setStatus = value;
+      button.textContent = text;
+      button.setAttribute("aria-pressed", row.status === value ? "true" : "false");
+      group.append(button);
+    }
+    status.append(label, group);
+
+    tr.append(number, source, target, category, status);
+    return tr;
+  }
+
+  function makeTextarea(index, field, value) {
     const textarea = document.createElement("textarea");
     textarea.className = "bo";
     textarea.lang = "bo";
@@ -272,32 +265,11 @@
     textarea.setAttribute("autocorrect", "off");
     textarea.setAttribute("data-gramm", "false");
     textarea.dataset.index = String(index);
-    textarea.value = row.corrected;
-    textarea.setAttribute("aria-label", `Target for row ${index + 1}`);
-    target.append(textarea);
-
-    const status = document.createElement("td");
-    status.className = "status";
-    status.dataset.label = "Status";
-    const label = document.createElement("p");
-    label.className = "status-label";
-    label.textContent = statusLabel(row.status);
-    const group = document.createElement("div");
-    group.className = "status-actions";
-    group.setAttribute("role", "group");
-    group.setAttribute("aria-label", `Status for row ${index + 1}`);
-    for (const [value, text] of [["accepted", "Accept"], ["edited", "Edit"], ["rejected", "Reject"]]) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.dataset.setStatus = value;
-      button.textContent = text;
-      button.setAttribute("aria-pressed", row.status === value ? "true" : "false");
-      group.append(button);
-    }
-    status.append(label, group);
-
-    tr.append(number, source, target, status);
-    return tr;
+    textarea.dataset.field = field;
+    textarea.value = value;
+    const label = field === "source" ? "Source" : "Target";
+    textarea.setAttribute("aria-label", `${label} for row ${index + 1}`);
+    return textarea;
   }
 
   function renderRows() {
@@ -344,7 +316,7 @@
   }
 
   function updateStats() {
-    const counts = { accepted: 0, edited: 0, rejected: 0, pending: 0 };
+    const counts = { accepted: 0, edited: 0, pending: 0 };
     for (const row of state.rows) {
       if (counts[row.status] != null) counts[row.status] += 1;
       else counts.pending += 1;
@@ -357,7 +329,6 @@
     els.rowPosition.textContent = `Row ${current} of ${total}`;
     els.counts.accepted.textContent = String(counts.accepted);
     els.counts.edited.textContent = String(counts.edited);
-    els.counts.rejected.textContent = String(counts.rejected);
     els.counts.pending.textContent = String(counts.pending);
     els.meterFill.style.width = `${pct}%`;
     els.meter.setAttribute("aria-valuenow", String(pct));
@@ -417,12 +388,13 @@
 
   function serialize() {
     return {
-      version: 1,
+      version: 2,
       filename: state.filename,
       headers: state.headers,
       rows: state.rows.map((row) => ({
         original: { ...row.original },
-        corrected: row.corrected,
+        correctedSource: row.correctedSource,
+        correctedTarget: row.correctedTarget,
         status: row.status,
       })),
       page: state.page,
@@ -454,41 +426,67 @@
     saveTimer = setTimeout(flushSave, 300);
   }
 
-  function restore() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return false;
-    let data;
-    try {
-      data = JSON.parse(raw);
-    } catch (error) {
-      localStorage.removeItem(STORAGE_KEY);
-      return false;
-    }
-    if (!data || data.version !== 1) return false;
-    const valid = data
+  function rowFromSaved(row) {
+    const original = row.original;
+    const correctedSource = typeof row.correctedSource === "string"
+      ? row.correctedSource
+      : cellString(original.source);
+    const correctedTarget = typeof row.correctedTarget === "string"
+      ? row.correctedTarget
+      : (typeof row.corrected === "string" ? row.corrected : cellString(original.target));
+    return {
+      original,
+      correctedSource,
+      correctedTarget,
+      status: priorStatus(row.status),
+    };
+  }
+
+  function savedSessionIsValid(data) {
+    return Boolean(data
+      && (data.version === 1 || data.version === 2)
       && Array.isArray(data.headers)
       && data.headers.includes("source")
       && data.headers.includes("target")
       && Array.isArray(data.rows)
       && data.rows.length > 0
-      && data.rows.every((row) => row
-        && row.original
-        && typeof row.original === "object"
-        && typeof row.corrected === "string"
-        && ANNOTATION_STATUSES.has(row.status));
-    if (!valid) {
-      localStorage.removeItem(STORAGE_KEY);
-      return false;
-    }
+      && data.rows.every((row) => row && row.original && typeof row.original === "object"));
+  }
+
+  function applySaved(data) {
     state.filename = typeof data.filename === "string" && data.filename ? data.filename : "annotation.csv";
     state.headers = data.headers;
-    state.rows = data.rows;
+    state.rows = data.rows.map(rowFromSaved);
     state.page = Number.isInteger(data.page) && data.page >= 0 ? data.page : 0;
     state.pageSize = PAGE_SIZES.includes(data.pageSize) ? data.pageSize : 20;
     state.filter = FILTERS.includes(data.filter) ? data.filter : "all";
     state.activeIndex = Number.isInteger(data.activeIndex)
       ? Math.min(Math.max(data.activeIndex, 0), data.rows.length - 1)
       : 0;
+  }
+
+  function readStorage(key) {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (error) {
+      localStorage.removeItem(key);
+      return null;
+    }
+  }
+
+  function restore() {
+    const current = readStorage(STORAGE_KEY);
+    if (savedSessionIsValid(current)) {
+      applySaved(current);
+      return true;
+    }
+    const legacy = readStorage(LEGACY_STORAGE_KEY);
+    if (!savedSessionIsValid(legacy)) return false;
+    applySaved(legacy);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    flushSave();
     return true;
   }
 
@@ -547,11 +545,23 @@
 
   function downloadCsv() {
     if (!state.rows.length || typeof Papa === "undefined") return;
-    const fields = state.headers.concat(["corrected_target", "status"]);
-    const data = state.rows.map((row) => {
+    const pending = state.rows.filter((row) => row.status === "pending").length;
+    if (pending > 0) {
+      const noun = pending === 1 ? "row is" : "rows are";
+      const proceed = confirm(`${pending} ${noun} still pending and will be left out of the download.`);
+      if (!proceed) return;
+    }
+    const reviewed = state.rows.filter((row) => row.status === "accepted" || row.status === "edited");
+    if (!reviewed.length) {
+      flash("Nothing to download. Accept or edit at least one row.");
+      return;
+    }
+    const fields = state.headers.concat(["corrected_source", "corrected_target", "status"]);
+    const data = reviewed.map((row) => {
       const out = Object.create(null);
       for (const field of state.headers) assignCell(out, field, row.original[field] ?? "");
-      assignCell(out, "corrected_target", row.corrected);
+      assignCell(out, "corrected_source", row.correctedSource);
+      assignCell(out, "corrected_target", row.correctedTarget);
       assignCell(out, "status", row.status);
       return out;
     });
@@ -607,7 +617,7 @@
     state.page = Math.floor(Math.max(position, 0) / state.pageSize);
     renderRows();
     flushSave();
-    const textarea = els.tbody.querySelector(`textarea[data-index="${index}"]`);
+    const textarea = els.tbody.querySelector(`textarea[data-index="${index}"][data-field="target"]`);
     if (textarea) {
       textarea.focus({ preventScroll: true });
       textarea.scrollIntoView({ block: "center" });
@@ -654,8 +664,8 @@
   function setStatus(index, status) {
     const row = state.rows[index];
     if (!row || !ANNOTATION_STATUSES.has(status) || status === "pending") return;
-    if ((status === "accepted" || status === "rejected") && row.status === status) {
-      row.status = row.corrected !== (row.original.target ?? "") ? "edited" : "pending";
+    if (status === "accepted" && row.status === status) {
+      row.status = rowChanged(row) ? "edited" : "pending";
     } else {
       row.status = status;
     }
@@ -671,17 +681,18 @@
     }
     flushSave();
     if (status === "edited") {
-      const textarea = els.tbody.querySelector(`textarea[data-index="${index}"]`);
+      const textarea = els.tbody.querySelector(`textarea[data-index="${index}"][data-field="target"]`);
       if (textarea) textarea.focus();
     }
   }
 
-  function onTargetInput(textarea) {
+  function onFieldInput(textarea) {
     const index = Number(textarea.dataset.index);
     const row = state.rows[index];
     if (!row) return;
-    row.corrected = textarea.value;
-    if (textarea.value !== (row.original.target ?? "")) row.status = "edited";
+    if (textarea.dataset.field === "source") row.correctedSource = textarea.value;
+    else row.correctedTarget = textarea.value;
+    if (rowChanged(row)) row.status = "edited";
     else if (row.status === "edited") row.status = "pending";
     paintRow(index);
     updateStats();
@@ -740,7 +751,7 @@
     }
 
     els.tbody.addEventListener("input", (event) => {
-      if (event.target instanceof HTMLTextAreaElement) onTargetInput(event.target);
+      if (event.target instanceof HTMLTextAreaElement) onFieldInput(event.target);
     });
     els.tbody.addEventListener("focusin", (event) => {
       if (event.target instanceof HTMLTextAreaElement) setActive(Number(event.target.dataset.index));

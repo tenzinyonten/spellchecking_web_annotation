@@ -125,7 +125,6 @@ body.has-data .tools {
 
 .counts li[data-count="accepted"] strong { color: var(--accept); }
 .counts li[data-count="edited"] strong { color: var(--edit); }
-.counts li[data-count="rejected"] strong { color: var(--reject); }
 .counts li[data-count="pending"] strong { color: var(--muted); }
 
 .toolbar {
@@ -288,9 +287,10 @@ thead th {
   color: var(--muted);
 }
 
-.col-num { width: 4.5rem; }
-.col-text { width: calc((100% - 13.75rem) / 2); }
-.col-status { width: 9.25rem; }
+.col-num { width: 3.25rem; }
+.col-cat { width: 15rem; }
+.col-text { width: calc((100% - 26rem) / 2); }
+.col-status { width: 7.75rem; }
 
 tbody th, tbody td {
   vertical-align: top;
@@ -318,12 +318,9 @@ tr[data-status="accepted"] th,
 tr[data-status="accepted"] td { background: #f3faf6; }
 tr[data-status="edited"] th,
 tr[data-status="edited"] td { background: #fdf8ee; }
-tr[data-status="rejected"] th,
-tr[data-status="rejected"] td { background: #fdf6f5; }
 
 tr[data-status="accepted"] th { box-shadow: inset 4px 0 0 var(--accept); }
 tr[data-status="edited"] th { box-shadow: inset 4px 0 0 var(--edit); }
-tr[data-status="rejected"] th { box-shadow: inset 4px 0 0 var(--reject); }
 
 tr.is-active th, tr.is-active td { border-color: #e0b27a; }
 
@@ -335,7 +332,7 @@ tr.is-active th, tr.is-active td { border-color: #e0b27a; }
   font-synthesis: none;
 }
 
-.source-text, textarea.bo {
+textarea.bo {
   margin: 0;
   padding: 0.65rem 0.75rem;
   background: #fff;
@@ -357,7 +354,11 @@ textarea.bo {
   max-height: 24rem;
 }
 
-.source-text { max-height: 24rem; overflow: auto; }
+.category {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+}
 
 textarea.bo:focus {
   border-color: var(--accent);
@@ -400,7 +401,6 @@ textarea.bo:focus {
 
 tr[data-status="accepted"] .status-label { color: var(--accept); }
 tr[data-status="edited"] .status-label { color: var(--edit); }
-tr[data-status="rejected"] .status-label { color: var(--reject); }
 
 .status-actions {
   display: flex;
@@ -420,12 +420,6 @@ tr[data-status="rejected"] .status-label { color: var(--reject); }
   background: #f3d48a;
   border-color: var(--edit);
   color: #3d2a06;
-}
-
-.status-actions button[data-set-status="rejected"][aria-pressed="true"] {
-  background: var(--reject);
-  border-color: var(--reject);
-  color: #fff;
 }
 
 .empty-filter {
