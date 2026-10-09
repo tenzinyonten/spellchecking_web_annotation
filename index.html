@@ -30,6 +30,7 @@
         <label class="btn primary" for="file-input">Upload CSV</label>
         <input id="file-input" class="sr-only" type="file" accept=".csv,text/csv">
         <button id="download-btn" class="btn" type="button" disabled>Download CSV</button>
+        <p id="download-note" class="download-note">Accept at least one row to download</p>
         <button id="reset-btn" class="btn danger" type="button" disabled>Reset</button>
       </div>
 
@@ -37,6 +38,7 @@
         <p id="file-label"></p>
         <p id="save-label"></p>
       </div>
+      <p id="save-warning" class="save-warning hidden" role="alert">Your progress can't be saved in this browser. Download the CSV now.</p>
 
       <div id="stats" class="stats hidden">
         <div class="stats-main">
@@ -94,7 +96,7 @@
       </p>
       <details>
         <summary>What the download contains</summary>
-        <p>The file has every row, in the original order. Every original column is copied unchanged, then <code>corrected_source</code>, <code>corrected_target</code>, and <code>status</code> (<code>accepted</code> or <code>pending</code>) are added. Only rows with status <code>accepted</code> are reviewed. The file is UTF-8 with a byte order mark so Excel opens Tibetan text.</p>
+        <p>The file has accepted rows only, in the original order. Every original column is copied unchanged, then <code>corrected_source</code>, <code>corrected_target</code>, and <code>status</code> (always <code>accepted</code>) are added. Pending rows are not included, even if their text was edited. The file is UTF-8 with a byte order mark so Excel opens Tibetan text.</p>
         <p>Work is saved in this browser. Refreshing the page brings it back. Reset clears that saved session and does not delete a file you already downloaded.</p>
       </details>
     </section>

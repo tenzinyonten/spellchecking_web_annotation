@@ -12,9 +12,11 @@
     backBtn: $("back-btn"),
     resumeBtn: $("resume-btn"),
     downloadBtn: $("download-btn"),
+    downloadNote: $("download-note"),
     resetBtn: $("reset-btn"),
     fileLabel: $("file-label"),
     saveLabel: $("save-label"),
+    saveWarning: $("save-warning"),
     rowPosition: $("row-position"),
     meter: $("meter"),
     meterFill: $("meter-fill"),
@@ -349,8 +351,8 @@
     els.meterFill.style.width = `${pct}%`;
     els.meter.setAttribute("aria-valuenow", String(pct));
     els.meter.setAttribute("aria-valuetext", `${reviewed} of ${total} reviewed`);
-    els.downloadBtn.disabled = total === 0;
     els.resetBtn.disabled = total === 0;
+    updateDownloadNote();
     updateResumeButton();
     document.title = total
       ? `Row ${current} of ${total} · Tibetan annotation`
@@ -374,6 +376,31 @@
       tr.classList.toggle("is-active", Number(tr.dataset.index) === index);
     }
     updateStats();
+  }
+
+  function updateDownloadNote() {
+    if (!els.downloadNote) return;
+    const accepted = [];
+    const pending = [];
+    for (const row of state.rows) {
+      if (row.status === "accepted") accepted.push(row);
+      else pending.push(row);
+    }
+    els.downloadBtn.disabled = accepted.length === 0;
+    if (!accepted.length) {
+      els.downloadNote.textContent = "Accept at least one row to download";
+      return;
+    }
+    const pendingEdits = pending.filter(rowChanged).length;
+    const acceptLabel = accepted.length === 1 ? "1 accepted row" : `${accepted.length} accepted rows`;
+    const pendingLabel = pending.length === 1 ? "1 pending row is not included" : `${pending.length} pending rows are not included`;
+    let text = `Downloads ${acceptLabel}. ${pendingLabel}.`;
+    if (pendingEdits) {
+      text += pendingEdits === 1
+        ? " 1 of them has edits that aren't accepted yet."
+        : ` ${pendingEdits} of them have edits that aren't accepted yet.`;
+    }
+    els.downloadNote.textContent = text;
   }
 
   function reviewedCount(rows) {
@@ -498,6 +525,9 @@
     els.backBtn.classList.add("hidden");
     els.downloadBtn.disabled = true;
     els.resetBtn.disabled = state.rows.length === 0;
+    if (els.downloadNote && !state.rows.length) {
+      els.downloadNote.textContent = "Accept at least one row to download";
+    }
     els.rowPosition.textContent = "Row 0 of 0";
     document.title = "Tibetan sentence annotation";
     updateResumeButton();
@@ -536,23 +566,37 @@
     };
   }
 
+  function showSaveWarning() {
+    state.saveError = true;
+    const message = "Your progress can't be saved in this browser. Download the CSV now.";
+    els.saveLabel.textContent = message;
+    if (els.saveWarning) {
+      els.saveWarning.textContent = message;
+      els.saveWarning.classList.remove("hidden");
+    }
+  }
+
+  function hideSaveWarning() {
+    if (els.saveWarning) els.saveWarning.classList.add("hidden");
+  }
+
   function flushSave() {
     clearTimeout(saveTimer);
     if (!state.rows.length) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize()));
       state.saveError = false;
+      hideSaveWarning();
       const time = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
       els.saveLabel.textContent = `Saved in this browser at ${time}`;
     } catch (error) {
-      state.saveError = true;
-      els.saveLabel.textContent = "Could not save in this browser. Download a CSV so this work is not lost.";
+      showSaveWarning();
     }
   }
 
   function scheduleSave() {
     if (!state.rows.length) return;
-    els.saveLabel.textContent = "Saving…";
+    if (!state.saveError) els.saveLabel.textContent = "Saving…";
     clearTimeout(saveTimer);
     saveTimer = setTimeout(flushSave, 300);
   }
@@ -692,13 +736,15 @@
 
   function downloadCsv() {
     if (!state.rows.length || typeof Papa === "undefined") return;
+    const reviewed = state.rows.filter((row) => row.status === "accepted");
+    if (!reviewed.length) return;
     const fields = state.headers.concat(["corrected_source", "corrected_target", "status"]);
-    const data = state.rows.map((row) => {
+    const data = reviewed.map((row) => {
       const out = Object.create(null);
       for (const field of state.headers) assignCell(out, field, row.original[field] ?? "");
       assignCell(out, "corrected_source", row.correctedSource);
       assignCell(out, "corrected_target", row.correctedTarget);
-      assignCell(out, "status", row.status === "accepted" ? "accepted" : "pending");
+      assignCell(out, "status", "accepted");
       return out;
     });
     const csv = Papa.unparse({ fields, data }, { newline: "\r\n" });
@@ -740,6 +786,8 @@
     els.tbody.replaceChildren();
     els.saveLabel.textContent = "";
     els.fileLabel.textContent = "";
+    hideSaveWarning();
+    if (els.downloadNote) els.downloadNote.textContent = "Accept at least one row to download";
     showEmpty();
     clearFlash();
   }
@@ -821,6 +869,7 @@
       flushSave();
       return;
     }
+    updateDownloadNote();
     scheduleSave();
   }
 

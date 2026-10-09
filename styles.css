@@ -88,6 +88,25 @@ body.has-data .tools {
 
 .session-bar p { margin: 0; }
 
+.download-note {
+  margin: 0;
+  max-width: 28rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.save-warning {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  background: #fdecea;
+  border: 1px solid #e4b4ae;
+  border-radius: 10px;
+  color: var(--reject);
+  font-weight: 600;
+}
+
 .row-position {
   margin: 0;
   min-width: 8.5rem;
