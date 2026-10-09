@@ -71,7 +71,7 @@ body.has-data .tools {
   gap: 0.45rem;
 }
 
-.actions, .toolbar-controls, .pager, .control, .session-bar, .stats-main, .counts, .filters {
+.actions, .toolbar-controls, .control, .session-bar, .stats-main, .counts, .filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -171,7 +171,7 @@ body.has-data .tools {
 
 .filters { gap: 0.35rem; }
 
-.filters button, .status-actions button, .pager button {
+.filters button, .status-actions button {
   border: 1px solid var(--line);
   background: #fff;
   color: var(--ink);
@@ -208,14 +208,6 @@ input[type="number"], select {
 }
 
 input[type="number"] { width: 5.2rem; }
-
-.pager p {
-  margin: 0;
-  min-width: 12rem;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
 
 .btn {
   display: inline-flex;
@@ -526,8 +518,6 @@ tr.is-leaving td {
   text-underline-offset: 0.15em;
 }
 
-.pager-bottom { margin: 0.5rem 0 1rem; justify-content: center; }
-
 .footer {
   padding: 0 0 2rem;
   color: var(--muted);
@@ -631,5 +621,4 @@ tr.is-leaving td {
 
   .status-actions { flex-direction: row; }
   .status-actions button { width: auto; flex: 1; }
-  .pager p { min-width: 0; }
 }

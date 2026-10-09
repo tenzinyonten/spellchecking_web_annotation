@@ -2,7 +2,6 @@
   const STORAGE_KEY = "tibetan-sentence-annotation-v2";
   const LEGACY_STORAGE_KEY = "tibetan-sentence-annotation-v1";
   const ANNOTATION_STATUSES = new Set(["pending", "accepted"]);
-  const PAGE_SIZES = [10, 20, 50];
   const FILTERS = ["all", "pending", "accepted"];
 
   const $ = (id) => document.getElementById(id);
@@ -42,7 +41,6 @@
     nextPending: $("next-pending"),
     gotoInput: $("goto-input"),
     gotoBtn: $("goto-btn"),
-    pageSize: $("page-size"),
   };
 
   const state = {
@@ -141,7 +139,7 @@
       notices.push(`CSV warning: ${results.errors[0].message}.`);
     }
     if (records.length > 2000) {
-      notices.push(`Opened ${records.length} rows in pages. Download a copy if this browser cannot store the whole file.`);
+      notices.push(`Opened ${records.length} rows. Download a copy if this browser cannot store the whole file.`);
     }
 
     return {
@@ -289,15 +287,8 @@
 
   function renderRows() {
     const list = visibleIndices();
-    const pages = Math.max(1, Math.ceil(list.length / state.pageSize) || 1);
-    if (state.page > pages - 1) state.page = Math.max(0, pages - 1);
-    if (state.page < 0) state.page = 0;
-
-    const start = state.page * state.pageSize;
-    const slice = list.slice(start, start + state.pageSize);
-    if (slice.length && !slice.includes(state.activeIndex)) state.activeIndex = slice[0];
     const fragment = document.createDocumentFragment();
-    for (const index of slice) fragment.append(renderRow(index));
+    for (const index of list) fragment.append(renderRow(index));
     els.tbody.replaceChildren(fragment);
 
     const filteredOut = list.length === 0;
@@ -308,24 +299,9 @@
     if (!pendingDone) els.emptyFilterText.textContent = "No rows in this filter.";
     els.tableWrap.classList.toggle("hidden", filteredOut);
 
-    const from = list.length ? start + 1 : 0;
-    const to = start + slice.length;
-    const filterNote = state.filter === "all" || !list.length ? "" : ` ${state.filter}`;
-    const pageText = list.length
-      ? `Page ${state.page + 1} of ${pages} · ${from}–${to} of ${list.length}${filterNote}`
-      : "Page 0 of 0";
-    for (const node of document.querySelectorAll("[data-page-label]")) node.textContent = pageText;
-
-    for (const button of document.querySelectorAll("[data-pager='prev']")) {
-      button.disabled = state.page <= 0 || !list.length;
-    }
-    for (const button of document.querySelectorAll("[data-pager='next']")) {
-      button.disabled = state.page >= pages - 1 || !list.length;
-    }
     for (const button of document.querySelectorAll("[data-filter]")) {
       button.setAttribute("aria-pressed", button.dataset.filter === state.filter ? "true" : "false");
     }
-    els.pageSize.value = String(state.pageSize);
     els.gotoInput.max = String(Math.max(state.rows.length, 1));
 
     requestAnimationFrame(() => {
@@ -465,9 +441,6 @@
     row.status = "pending";
     markDirty();
     state.filter = "pending";
-    const list = visibleIndices();
-    const position = list.indexOf(index);
-    if (position >= 0) state.page = Math.floor(position / state.pageSize);
     const scrollY = window.scrollY;
     renderRows();
     window.scrollTo(0, scrollY);
@@ -638,8 +611,6 @@
     state.filename = typeof data.filename === "string" && data.filename ? data.filename : "annotation.csv";
     state.headers = data.headers;
     state.rows = data.rows.map(rowFromSaved);
-    state.page = Number.isInteger(data.page) && data.page >= 0 ? data.page : 0;
-    state.pageSize = PAGE_SIZES.includes(data.pageSize) ? data.pageSize : 20;
     state.filter = "pending";
     state.activeIndex = Number.isInteger(data.activeIndex)
       ? Math.min(Math.max(data.activeIndex, 0), data.rows.length - 1)
@@ -648,12 +619,7 @@
     for (let i = 0; i < state.rows.length; i += 1) {
       if (state.rows[i].status === "pending") pending.push(i);
     }
-    if (pending.includes(state.activeIndex)) {
-      state.page = Math.floor(pending.indexOf(state.activeIndex) / state.pageSize);
-    } else {
-      state.page = 0;
-      if (pending.length) state.activeIndex = pending[0];
-    }
+    if (!pending.includes(state.activeIndex) && pending.length) state.activeIndex = pending[0];
     if (typeof data.dirtySinceDownload === "boolean") {
       state.dirtySinceDownload = data.dirtySinceDownload;
     } else {
@@ -826,9 +792,7 @@
       state.filter = "all";
       list = visibleIndices();
     }
-    const position = list.indexOf(index);
     state.activeIndex = index;
-    state.page = Math.floor(Math.max(position, 0) / state.pageSize);
     renderRows();
     flushSave();
     const textarea = els.tbody.querySelector(`textarea[data-index="${index}"][data-field="target"]`);
@@ -836,17 +800,6 @@
       textarea.focus({ preventScroll: true });
       textarea.scrollIntoView({ block: "center" });
     }
-  }
-
-  function shiftPage(delta) {
-    const list = visibleIndices();
-    const pages = Math.max(1, Math.ceil(list.length / state.pageSize));
-    const next = state.page + delta;
-    if (next < 0 || next >= pages) return;
-    state.page = next;
-    renderRows();
-    flushSave();
-    els.tableWrap.scrollIntoView({ block: "nearest" });
   }
 
   function goToRow() {
@@ -922,12 +875,7 @@
       for (let i = 0; i < state.rows.length; i += 1) {
         if (state.rows[i].status === "pending") pending.push(i);
       }
-      if (pending.includes(state.activeIndex)) {
-        state.page = Math.floor(pending.indexOf(state.activeIndex) / state.pageSize);
-      } else {
-        state.page = 0;
-        if (pending.length) state.activeIndex = pending[0];
-      }
+      if (!pending.includes(state.activeIndex) && pending.length) state.activeIndex = pending[0];
       showWorkspace();
     });
     els.downloadBtn.addEventListener("click", downloadCsv);
@@ -944,29 +892,11 @@
       }
     });
 
-    els.pageSize.addEventListener("change", () => {
-      const size = Number(els.pageSize.value);
-      if (!PAGE_SIZES.includes(size)) return;
-      state.pageSize = size;
-      const list = visibleIndices();
-      const position = Math.max(0, list.indexOf(state.activeIndex));
-      state.page = Math.floor(position / state.pageSize);
-      renderRows();
-      flushSave();
-    });
-
     for (const button of document.querySelectorAll("[data-filter]")) {
       button.addEventListener("click", () => {
         state.filter = button.dataset.filter;
-        state.page = 0;
         renderRows();
         flushSave();
-      });
-    }
-
-    for (const button of document.querySelectorAll("[data-pager]")) {
-      button.addEventListener("click", () => {
-        shiftPage(button.dataset.pager === "next" ? 1 : -1);
       });
     }
 
