@@ -38,9 +38,6 @@
     toolbar: $("toolbar"),
     sessionBar: $("session-bar"),
     stats: $("stats"),
-    nextPending: $("next-pending"),
-    gotoInput: $("goto-input"),
-    gotoBtn: $("goto-btn"),
   };
 
   const state = {
@@ -302,7 +299,6 @@
     for (const button of document.querySelectorAll("[data-filter]")) {
       button.setAttribute("aria-pressed", button.dataset.filter === state.filter ? "true" : "false");
     }
-    els.gotoInput.max = String(Math.max(state.rows.length, 1));
 
     requestAnimationFrame(() => {
       els.tbody.querySelectorAll("textarea").forEach(autosize);
@@ -802,32 +798,6 @@
     }
   }
 
-  function goToRow() {
-    const value = Number(els.gotoInput.value);
-    if (!Number.isInteger(value) || value < 1 || value > state.rows.length) {
-      flash(state.rows.length
-        ? `Enter a row number from 1 to ${state.rows.length}.`
-        : "Upload a CSV before jumping to a row.");
-      return;
-    }
-    state.filter = "all";
-    openRow(value - 1);
-  }
-
-  function nextPending() {
-    const total = state.rows.length;
-    if (!total) return;
-    for (let step = 1; step <= total; step += 1) {
-      const index = (state.activeIndex + step) % total;
-      if (state.rows[index].status === "pending") {
-        const filter = state.filter === "all" || state.filter === "pending" ? state.filter : "pending";
-        openRow(index, { filter });
-        return;
-      }
-    }
-    flash("No pending rows.");
-  }
-
   function setStatus(index, status) {
     if (status === "accepted") acceptRow(index);
   }
@@ -883,14 +853,6 @@
     els.emptyDownload.addEventListener("click", downloadCsv);
     els.toastUndo.addEventListener("click", undoAccept);
     els.resetBtn.addEventListener("click", resetSession);
-    els.nextPending.addEventListener("click", nextPending);
-    els.gotoBtn.addEventListener("click", goToRow);
-    els.gotoInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        goToRow();
-      }
-    });
 
     for (const button of document.querySelectorAll("[data-filter]")) {
       button.addEventListener("click", () => {
