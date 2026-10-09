@@ -775,12 +775,13 @@
     downloadUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = downloadUrl;
-    link.download = downloadFilename();
+    const name = downloadFilename();
+    link.download = name;
     document.body.append(link);
     link.click();
     link.remove();
-    state.dirtySinceDownload = false;
-    flushSave();
+    clearSession();
+    flash(`Downloaded ${name}. Upload another CSV when you're ready.`);
     const url = downloadUrl;
     setTimeout(() => {
       if (downloadUrl === url) {
@@ -790,10 +791,7 @@
     }, 60000);
   }
 
-  function resetSession() {
-    if (!state.rows.length) return;
-    const ok = confirm("Clear all annotation progress saved in this browser? This does not delete a CSV you already downloaded.");
-    if (!ok) return;
+  function clearSession() {
     clearTimeout(saveTimer);
     localStorage.removeItem(STORAGE_KEY);
     state.filename = "";
@@ -811,6 +809,13 @@
     hideSaveWarning();
     showEmpty();
     clearFlash();
+  }
+
+  function resetSession() {
+    if (!state.rows.length) return;
+    const ok = confirm("Clear all annotation progress saved in this browser? This does not delete a CSV you already downloaded.");
+    if (!ok) return;
+    clearSession();
   }
 
   function openRow(index, options = {}) {
