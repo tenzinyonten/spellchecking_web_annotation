@@ -72,8 +72,9 @@
     });
   }
 
-  // Annotation columns are restored into the editor and appended again on
-  // download. Every other input column, including source and target, is kept.
+  // corrected_source, corrected_target, and an annotation status column are
+  // editor fields only. A download writes the accepted text back into source
+  // and target and does not add columns.
   function splitColumns(fields, records) {
     const hasCorrectedSource = fields.includes("corrected_source");
     const hasCorrectedTarget = fields.includes("corrected_target");
@@ -701,13 +702,15 @@
 
   function downloadCsv() {
     if (!allRowsAccepted() || typeof Papa === "undefined") return;
-    const fields = state.headers.concat(["corrected_source", "corrected_target", "status"]);
+    const fields = state.headers.slice();
     const data = state.rows.map((row) => {
       const out = Object.create(null);
-      for (const field of state.headers) assignCell(out, field, row.original[field] ?? "");
-      assignCell(out, "corrected_source", row.correctedSource);
-      assignCell(out, "corrected_target", row.correctedTarget);
-      assignCell(out, "status", "accepted");
+      for (const field of fields) {
+        let value = row.original[field] ?? "";
+        if (field === "source") value = row.correctedSource;
+        else if (field === "target") value = row.correctedTarget;
+        assignCell(out, field, value);
+      }
       return out;
     });
     const csv = Papa.unparse({ fields, data }, { newline: "\r\n" });
