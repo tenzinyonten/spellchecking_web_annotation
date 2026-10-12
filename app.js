@@ -206,11 +206,11 @@
     const source = document.createElement("div");
     source.className = "source";
     source.dataset.label = "Source";
-    source.append(makeTextarea(index, "source", row.correctedSource));
+    source.append(wrapField(makeTextarea(index, "source", row.correctedSource)));
     const target = document.createElement("div");
     target.className = "target";
     target.dataset.label = "Target";
-    target.append(makeTextarea(index, "target", row.correctedTarget));
+    target.append(wrapField(makeTextarea(index, "target", row.correctedTarget)));
     pair.append(source, target);
     texts.append(pair);
     const loc = fillRowLoc(row.original);
@@ -268,6 +268,59 @@
     const label = field === "source" ? "Source" : "Target";
     textarea.setAttribute("aria-label", `${label} for row ${index + 1}`);
     return textarea;
+  }
+
+  function wrapField(textarea) {
+    const field = document.createElement("div");
+    field.className = "bo-field";
+    const caret = document.createElement("span");
+    caret.className = "bo-caret";
+    caret.setAttribute("aria-hidden", "true");
+    field.append(textarea, caret);
+    return field;
+  }
+
+  function caretPoint(textarea) {
+    const style = getComputedStyle(textarea);
+    const mirror = document.createElement("div");
+    mirror.style.position = "absolute";
+    mirror.style.visibility = "hidden";
+    mirror.style.whiteSpace = "pre-wrap";
+    mirror.style.overflowWrap = "break-word";
+    mirror.style.wordBreak = "break-word";
+    mirror.style.top = "0";
+    mirror.style.left = "0";
+    for (const key of ["boxSizing", "fontFamily", "fontSize", "fontWeight", "lineHeight", "letterSpacing", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth"]) {
+      mirror.style[key] = style[key];
+    }
+    mirror.style.width = `${textarea.clientWidth}px`;
+    const before = document.createTextNode(textarea.value.slice(0, textarea.selectionStart));
+    const mark = document.createElement("span");
+    mark.textContent = "\u200b";
+    mirror.append(before, mark);
+    document.body.append(mirror);
+    const borderTop = parseFloat(style.borderTopWidth) || 0;
+    const borderLeft = parseFloat(style.borderLeftWidth) || 0;
+    const boxTop = mark.offsetTop + borderTop - textarea.scrollTop;
+    const boxLeft = mark.offsetLeft + borderLeft - textarea.scrollLeft;
+    const boxHeight = mark.offsetHeight;
+    mirror.remove();
+    return { boxTop, boxLeft, boxHeight };
+  }
+
+  function placeCaret(textarea) {
+    if (!(textarea instanceof HTMLTextAreaElement)) return;
+    const field = textarea.parentElement;
+    if (!field || !field.classList.contains("bo-field")) return;
+    const caret = field.querySelector(".bo-caret");
+    const focused = document.activeElement === textarea && textarea.selectionStart === textarea.selectionEnd;
+    field.classList.toggle("is-focused", focused);
+    if (!focused || !caret) return;
+    const point = caretPoint(textarea);
+    const height = point.boxHeight * 0.5;
+    const top = point.boxTop + point.boxHeight * 0.22;
+    caret.style.height = `${height}px`;
+    caret.style.transform = `translate(${point.boxLeft}px, ${top}px)`;
   }
 
   function renderRows() {
@@ -789,8 +842,20 @@
       if (event.target instanceof HTMLTextAreaElement) onFieldInput(event.target);
     });
     els.tbody.addEventListener("focusin", (event) => {
-      if (event.target instanceof HTMLTextAreaElement) setActive(Number(event.target.dataset.index));
+      if (event.target instanceof HTMLTextAreaElement) {
+        setActive(Number(event.target.dataset.index));
+        placeCaret(event.target);
+      }
     });
+    els.tbody.addEventListener("focusout", (event) => {
+      if (event.target instanceof HTMLTextAreaElement) {
+        event.target.parentElement?.classList.remove("is-focused");
+      }
+    });
+    els.tbody.addEventListener("keyup", (event) => placeCaret(event.target));
+    els.tbody.addEventListener("click", (event) => placeCaret(event.target));
+    els.tbody.addEventListener("scroll", (event) => placeCaret(event.target), true);
+    document.addEventListener("selectionchange", () => placeCaret(document.activeElement));
     els.tbody.addEventListener("click", (event) => {
       const back = event.target.closest("[data-move-pending]");
       if (back) {

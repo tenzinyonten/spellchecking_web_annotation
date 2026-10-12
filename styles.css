@@ -9,20 +9,8 @@
   --edit: #8a5a00;
   --reject: #8d2e2e;
   --shadow: 0 1px 0 rgba(36, 28, 22, 0.04);
-  --bo: "Noto Serif Tibetan UI", "Noto Serif Tibetan", "Jomolhari", "Tibetan Machine Uni", "Microsoft Himalaya", "Kailasa", "Kokonor", serif;
+  --bo: "Noto Serif Tibetan", "Jomolhari", "Tibetan Machine Uni", "Microsoft Himalaya", "Kailasa", "Kokonor", serif;
   color-scheme: light;
-}
-
-@font-face {
-  font-family: "Noto Serif Tibetan UI";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("https://fonts.gstatic.com/s/notoseriftibetan/v24/gokzH7nwAEdtF9N45n0Vaz7O-pk0wsvbBMgmy2UTva2n.woff2") format("woff2");
-  unicode-range: U+0F00-0FFF, U+200C-200D, U+25CC, U+3008-300B;
-  ascent-override: 95%;
-  descent-override: 65%;
-  line-gap-override: 0%;
 }
 
 * { box-sizing: border-box; }
@@ -273,7 +261,7 @@ tr.is-active th, tr.is-active td { border-color: #e0b27a; }
   font-family: var(--bo);
   font-size: 1.375rem;
   font-weight: 400;
-  line-height: 1.6;
+  line-height: 1.7;
   font-synthesis: none;
 }
 
@@ -283,7 +271,7 @@ textarea.bo {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
-  min-height: calc(2em * 1.6 + 0.7rem);
+  min-height: calc(2em * 1.7 + 0.7rem);
   white-space: pre-wrap;
   overflow-wrap: break-word;
   word-break: break-word;
@@ -312,10 +300,36 @@ textarea.bo {
   overflow-wrap: break-word;
 }
 
+textarea.bo {
+  caret-color: transparent;
+}
+
 textarea.bo:focus {
   border-color: var(--accent);
   outline: none;
   box-shadow: 0 0 0 3px rgba(125, 42, 34, 0.16);
+}
+
+.bo-field { position: relative; }
+
+.bo-caret {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1.5px;
+  background: var(--ink);
+  pointer-events: none;
+  display: none;
+  border-radius: 1px;
+}
+
+.bo-field.is-focused .bo-caret {
+  display: block;
+  animation: bo-caret-blink 1.05s step-end infinite;
+}
+
+@keyframes bo-caret-blink {
+  50% { opacity: 0; }
 }
 
 .meta {
@@ -453,6 +467,7 @@ tr.is-leaving td {
 tr, textarea.bo { scroll-margin-top: 5.5rem; }
 
 @media (prefers-reduced-motion: reduce) {
+  .bo-caret { animation: none; }
   tr.is-leaving,
   tr.is-leaving th,
   tr.is-leaving td { transition: none; }
