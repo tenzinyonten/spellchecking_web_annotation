@@ -11,7 +11,6 @@
     backBtn: $("back-btn"),
     resumeBtn: $("resume-btn"),
     downloadBtn: $("download-btn"),
-    downloadNote: $("download-note"),
     resetBtn: $("reset-btn"),
     saveWarning: $("save-warning"),
     banner: $("banner"),
@@ -334,25 +333,9 @@
   }
 
   function updateDownloadNote() {
-    if (!els.downloadNote) return;
-    const total = state.rows.length;
-    const pending = pendingCount();
     const ready = allRowsAccepted();
     els.downloadBtn.disabled = !ready;
     if (els.emptyDownload) els.emptyDownload.disabled = !ready;
-    els.downloadNote.classList.toggle("hidden", total === 0);
-    els.downloadNote.classList.toggle("is-link", total > 0 && !ready);
-    if (!total) {
-      els.downloadNote.textContent = "";
-      return;
-    }
-    if (ready) {
-      const noun = total === 1 ? "row" : "rows";
-      els.downloadNote.textContent = `All ${total} ${noun} accepted. Ready to download.`;
-      return;
-    }
-    const noun = pending === 1 ? "row" : "rows";
-    els.downloadNote.textContent = `${pending} ${noun} left to accept before you can download.`;
   }
 
   function reviewedCount(rows) {
@@ -663,24 +646,6 @@
     return `${cleaned || "annotation"}_annotated.csv`;
   }
 
-  function jumpToNextPending() {
-    const total = state.rows.length;
-    if (!total || allRowsAccepted()) return;
-    const start = document.body.classList.contains("has-data") ? state.activeIndex : -1;
-    for (let step = 1; step <= total; step += 1) {
-      const index = (start + step) % total;
-      if (state.rows[index].status === "pending") {
-        const filter = state.filter === "all" || state.filter === "pending" ? state.filter : "pending";
-        if (!document.body.classList.contains("has-data")) {
-          state.filter = filter;
-          showWorkspace();
-        }
-        openRow(index, { filter });
-        return;
-      }
-    }
-  }
-
   function downloadCsv() {
     if (!allRowsAccepted() || typeof Papa === "undefined") return;
     const fields = state.headers.concat(["corrected_source", "corrected_target", "status"]);
@@ -808,7 +773,6 @@
       showWorkspace();
     });
     els.downloadBtn.addEventListener("click", downloadCsv);
-    els.downloadNote.addEventListener("click", jumpToNextPending);
     els.emptyDownload.addEventListener("click", downloadCsv);
     els.toastUndo.addEventListener("click", undoAccept);
     els.resetBtn.addEventListener("click", resetSession);
