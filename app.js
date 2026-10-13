@@ -3,6 +3,7 @@
   const LEGACY_STORAGE_KEY = "tibetan-sentence-annotation-v1";
   const ANNOTATION_STATUSES = new Set(["pending", "accepted"]);
   const FILTERS = ["all", "pending", "accepted"];
+  const MAX_ROWS = 200;
 
   const $ = (id) => document.getElementById(id);
 
@@ -118,14 +119,17 @@
     if (!records.length) {
       return { ok: false, message: "That CSV has no data rows." };
     }
+    if (records.length > MAX_ROWS) {
+      return {
+        ok: false,
+        message: `This file has ${records.length} rows. This page takes batches of ${MAX_ROWS} rows or fewer.`,
+      };
+    }
 
     const split = splitColumns(fields, records);
     const notices = [];
     if (results.errors && results.errors.length) {
       notices.push(`CSV warning: ${results.errors[0].message}.`);
-    }
-    if (records.length > 2000) {
-      notices.push(`Opened ${records.length} rows. Download a copy if this browser cannot store the whole file.`);
     }
 
     return {
@@ -632,13 +636,22 @@
     }
   }
 
+  function discardOversizedSession(key, data) {
+    if (!data || !Array.isArray(data.rows) || data.rows.length <= MAX_ROWS) return false;
+    localStorage.removeItem(key);
+    flash(`A saved batch of ${data.rows.length} rows was cleared. This page takes batches of ${MAX_ROWS} rows or fewer.`);
+    return true;
+  }
+
   function restore() {
     const current = readStorage(STORAGE_KEY);
+    if (discardOversizedSession(STORAGE_KEY, current)) return false;
     if (savedSessionIsValid(current)) {
       applySaved(current);
       return true;
     }
     const legacy = readStorage(LEGACY_STORAGE_KEY);
+    if (discardOversizedSession(LEGACY_STORAGE_KEY, legacy)) return false;
     if (!savedSessionIsValid(legacy)) return false;
     applySaved(legacy);
     localStorage.removeItem(LEGACY_STORAGE_KEY);
