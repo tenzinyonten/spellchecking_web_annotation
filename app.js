@@ -174,17 +174,39 @@
       || row.correctedTarget !== (row.original.target ?? "");
   }
 
-  function fillRowLoc(original) {
-    const parts = [];
-    for (const key of ["page_id", "segment_idx", "split"]) {
-      const value = cellString(original[key]).trim();
-      if (value) parts.push(`${key} ${value}`);
-    }
-    if (!parts.length) return null;
-    const loc = document.createElement("p");
-    loc.className = "row-loc";
-    loc.textContent = parts.join(" · ");
-    return loc;
+  const CATEGORY_LABELS = {
+    "real:single_char_substitution": "One character changed",
+    "real:single_char_insert_delete": "One character added or removed",
+    "real:syllable_level": "A syllable changed",
+    "single_char_substitution": "One character changed",
+    "single_char_insert_delete": "One character added or removed",
+    "syllable_level": "A syllable changed",
+    "char_homomorphic_replace": "Lookalike character",
+    "syllable_random_merge": "Syllables joined",
+    "real_confusion_replace": "Common mix-up",
+    "char_random_insert": "Extra character",
+    "char_random_delete": "Missing character",
+    "char_inner_syllable_exchange": "Letters swapped",
+    "syllable_homophone": "Same-sound syllable",
+    "char_near_syllable_exchange": "Nearby syllables swapped",
+    "ungrouped": "Several changes",
+    "verb_tense_homophone": "Verb form",
+    "clean": "No difference",
+    "punctuation_only": "Punctuation only",
+    "whitespace_only": "Spacing only",
+    "multi_edit": "Several edits",
+    "large_rewrite": "Large rewrite",
+    "identical": "Same text",
+    "synthetic_type2": "Generated change",
+  };
+
+  function categoryLabel(raw) {
+    const value = cellString(raw).trim();
+    if (!value) return "";
+    if (Object.prototype.hasOwnProperty.call(CATEGORY_LABELS, value)) return CATEGORY_LABELS[value];
+    const bare = value.replace(/^real:/, "").replace(/[_-]+/g, " ").trim();
+    if (!bare) return "";
+    return bare.charAt(0).toUpperCase() + bare.slice(1);
   }
 
   function autosize(textarea) {
@@ -217,14 +239,16 @@
     target.dataset.label = "Target";
     target.append(wrapField(makeTextarea(index, "target", row.correctedTarget)));
     pair.append(source, target);
+    const category = categoryLabel(row.original.diff_category);
+    if (category) {
+      const chip = document.createElement("p");
+      chip.className = "diff-chip";
+      chip.textContent = category;
+      const raw = cellString(row.original.diff_category).trim();
+      if (raw && raw !== category) chip.title = raw;
+      texts.append(chip);
+    }
     texts.append(pair);
-    const loc = fillRowLoc(row.original);
-    if (loc) texts.append(loc);
-
-    const category = document.createElement("td");
-    category.className = "category";
-    category.dataset.label = "Category";
-    category.textContent = row.original.diff_category ?? "";
 
     const status = document.createElement("td");
     status.className = "status";
@@ -251,7 +275,7 @@
     }
     status.append(label, group);
 
-    tr.append(number, texts, category, status);
+    tr.append(number, texts, status);
     return tr;
   }
 

@@ -224,9 +224,8 @@ thead th {
 }
 
 .col-num { width: 3.5rem; }
-.col-cat { width: 12rem; }
-.col-text { width: calc((100% - 27.5rem) / 2); }
-.col-status { width: 12rem; }
+.col-text { width: calc((100% - 14.5rem) / 2); }
+.col-status { width: 11rem; }
 
 tbody th, tbody td {
   vertical-align: top;
@@ -294,10 +293,16 @@ textarea.bo {
   min-width: 0;
 }
 
-.category {
-  font-size: 0.85rem;
-  line-height: 1.4;
-  overflow-wrap: break-word;
+.diff-chip {
+  display: inline-block;
+  margin: 0 0 0.55rem;
+  padding: 0.18rem 0.65rem;
+  border-radius: 999px;
+  background: #f3eee6;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 textarea.bo {
@@ -391,17 +396,6 @@ tr[data-status="accepted"] .status-label { color: var(--accept); }
   font-weight: 600;
 }
 
-.row-loc {
-  margin: 0.4rem 0 0;
-  color: var(--muted);
-  font-size: 0.75rem;
-  font-weight: 400;
-  line-height: 1.4;
-  text-transform: none;
-  letter-spacing: 0;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
 
 tr.is-leaving {
   opacity: 0;
@@ -481,6 +475,16 @@ tr.is-leaving td {
 
 @media (max-width: 860px) {
   .wrap { width: min(1440px, calc(100% - 1.25rem)); }
+
+  h1 { font-size: 1.35rem; }
+
+  .filters { margin-left: 0; width: 100%; }
+
+  .drop-zone { padding: 1.5rem 1rem; }
+
+  .status-actions button { white-space: normal; }
+
+  tr, textarea.bo { scroll-margin-top: 12rem; }
 
   table, thead, tbody, tr, th, td { display: block; width: 100%; }
 

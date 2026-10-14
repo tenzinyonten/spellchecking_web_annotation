@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Tibetan:wght@400;600&display=swap" rel="stylesheet">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" href="favicon.ico" sizes="16x16">
-  <link rel="stylesheet" href="styles.css?v=12">
+  <link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body>
   <header class="wrap site-header">
@@ -46,7 +46,7 @@
   <main class="wrap">
     <section id="drop-zone" class="drop-zone" tabindex="0" aria-label="Upload CSV. Activate to choose a file, or drop a file here.">
       <h2>Drop a CSV here</h2>
-      <p>The header row must include <code>source</code> and <code>target</code>. Use a batch of 200 rows or fewer. Other columns, such as <code>diff_category</code>, <code>page_id</code>, and <code>segment_idx</code>, stay in the file you download.</p>
+      <p>The header row must include <code>source</code> and <code>target</code>. Use a batch of 200 rows or fewer. Extra columns stay in the file you download, and are not shown on this page.</p>
       <p class="resume-wrap">
         <button id="resume-btn" class="btn primary hidden" type="button">Resume last batch</button>
       </p>
@@ -60,13 +60,12 @@
     <section id="workspace" class="workspace hidden">
       <div id="table-wrap" class="table-wrap">
         <table>
-          <caption class="sr-only">Sentence pairs. Source and target can be edited. Category is read only. Accept a row when it is correct.</caption>
+          <caption class="sr-only">Sentence pairs. Source and target can be edited. The difference is shown above each pair. Accept a row when it is correct.</caption>
           <thead>
             <tr>
               <th class="col-num" scope="col">#</th>
               <th class="col-text" scope="col">Source</th>
               <th class="col-text" scope="col">Target</th>
-              <th class="col-cat" scope="col">Category</th>
               <th class="col-status" scope="col">Status</th>
             </tr>
           </thead>
@@ -101,6 +100,6 @@
     } catch (error) {}
   </script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>
