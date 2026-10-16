@@ -365,21 +365,23 @@ textarea.bo:focus {
 .diff-back .diff-del,
 .diff-back .diff-ins {
   color: var(--ink);
-  background: transparent;
-  border-radius: 0.15em;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-size: 100% 3px;
+  background-position: 0 1.72em;
+  box-shadow: none;
+  border-radius: 0;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   text-decoration: none;
 }
 
 .diff-back .diff-del {
-  background: rgba(180, 48, 38, 0.14);
-  box-shadow: inset 0 -0.14em 0 #c4453a;
+  background-image: linear-gradient(#c4453a, #c4453a);
 }
 
 .diff-back .diff-ins {
-  background: rgba(18, 110, 64, 0.14);
-  box-shadow: inset 0 -0.14em 0 #17824a;
+  background-image: linear-gradient(#17824a, #17824a);
 }
 
 .bo-caret {
