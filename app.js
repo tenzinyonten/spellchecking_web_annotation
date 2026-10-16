@@ -60,6 +60,66 @@
     return value == null ? "" : String(value);
   }
 
+  const graphemeSegmenter = typeof Intl !== "undefined" && Intl.Segmenter
+    ? new Intl.Segmenter("bo", { granularity: "grapheme" })
+    : null;
+
+  function graphemes(text) {
+    const value = String(text);
+    if (!graphemeSegmenter) return Array.from(value);
+    return [...graphemeSegmenter.segment(value)].map((part) => part.segment);
+  }
+
+  // Compare the CSV strings as stored. Do not normalize, reshape, or rewrite them.
+  function diffParts(sourceText, targetText) {
+    const source = graphemes(sourceText);
+    const target = graphemes(targetText);
+    const n = source.length;
+    const m = target.length;
+    const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+    for (let i = n - 1; i >= 0; i -= 1) {
+      const row = dp[i];
+      const next = dp[i + 1];
+      for (let j = m - 1; j >= 0; j -= 1) {
+        row[j] = source[i] === target[j]
+          ? next[j + 1] + 1
+          : Math.max(next[j], row[j + 1]);
+      }
+    }
+    const left = [];
+    const right = [];
+    const push = (list, kind, text) => {
+      const last = list[list.length - 1];
+      if (last && last.kind === kind) last.text += text;
+      else list.push({ kind, text });
+    };
+    let i = 0;
+    let j = 0;
+    while (i < n && j < m) {
+      if (source[i] === target[j]) {
+        push(left, "same", source[i]);
+        push(right, "same", target[j]);
+        i += 1;
+        j += 1;
+      } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+        push(left, "del", source[i]);
+        i += 1;
+      } else {
+        push(right, "ins", target[j]);
+        j += 1;
+      }
+    }
+    while (i < n) {
+      push(left, "del", source[i]);
+      i += 1;
+    }
+    while (j < m) {
+      push(right, "ins", target[j]);
+      j += 1;
+    }
+    return { left, right };
+  }
+
   function priorStatus(value) {
     const status = cellString(value).trim().toLowerCase();
     if (status === "accepted") return "accepted";
@@ -233,12 +293,15 @@
     const source = document.createElement("div");
     source.className = "source";
     source.dataset.label = "Source";
-    source.append(wrapField(makeTextarea(index, "source", row.correctedSource)));
+    const sourceField = wrapField(makeTextarea(index, "source", row.correctedSource));
+    source.append(sourceField);
     const target = document.createElement("div");
     target.className = "target";
     target.dataset.label = "Target";
-    target.append(wrapField(makeTextarea(index, "target", row.correctedTarget)));
+    const targetField = wrapField(makeTextarea(index, "target", row.correctedTarget));
+    target.append(targetField);
     pair.append(source, target);
+    paintPairDiff(sourceField, targetField);
     const category = categoryLabel(row.original.diff_category);
     if (category) {
       const chip = document.createElement("p");
@@ -302,11 +365,44 @@
   function wrapField(textarea) {
     const field = document.createElement("div");
     field.className = "bo-field";
+    const back = document.createElement("div");
+    back.className = "diff-back";
+    back.setAttribute("aria-hidden", "true");
     const caret = document.createElement("span");
     caret.className = "bo-caret";
     caret.setAttribute("aria-hidden", "true");
-    field.append(textarea, caret);
+    field.append(back, textarea, caret);
+    textarea.addEventListener("scroll", () => {
+      back.scrollTop = textarea.scrollTop;
+      back.scrollLeft = textarea.scrollLeft;
+    });
     return field;
+  }
+
+  function fillDiff(back, parts, changedKind) {
+    const fragment = document.createDocumentFragment();
+    for (const part of parts) {
+      if (part.kind === "same") {
+        fragment.append(document.createTextNode(part.text));
+      } else {
+        const mark = document.createElement("mark");
+        mark.className = changedKind === "del" ? "diff-del" : "diff-ins";
+        mark.textContent = part.text;
+        fragment.append(mark);
+      }
+    }
+    back.replaceChildren(fragment);
+  }
+
+  function paintPairDiff(sourceField, targetField) {
+    const source = sourceField.querySelector("textarea");
+    const target = targetField.querySelector("textarea");
+    const sourceBack = sourceField.querySelector(".diff-back");
+    const targetBack = targetField.querySelector(".diff-back");
+    if (!source || !target || !sourceBack || !targetBack) return;
+    const diff = diffParts(source.value, target.value);
+    fillDiff(sourceBack, diff.left, "del");
+    fillDiff(targetBack, diff.right, "ins");
   }
 
   function caretPoint(textarea) {
@@ -825,6 +921,11 @@
     if (!row) return;
     if (textarea.dataset.field === "source") row.correctedSource = textarea.value;
     else row.correctedTarget = textarea.value;
+    const pair = textarea.closest(".text-pair");
+    if (pair) {
+      const fields = pair.querySelectorAll(".bo-field");
+      if (fields.length === 2) paintPairDiff(fields[0], fields[1]);
+    }
     markDirty();
     autosize(textarea);
     if (row.status === "accepted") {

@@ -281,9 +281,18 @@ textarea.bo {
   width: 100%;
   max-width: 100%;
   resize: none;
-  color: var(--ink);
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background: transparent;
   overflow: auto;
   max-height: 24rem;
+  position: relative;
+  z-index: 1;
+}
+
+textarea.bo::selection {
+  background: rgba(125, 42, 34, 0.22);
+  -webkit-text-fill-color: transparent;
 }
 
 .text-pair {
@@ -315,12 +324,62 @@ textarea.bo:focus {
   box-shadow: 0 0 0 3px rgba(125, 42, 34, 0.16);
 }
 
-.bo-field { position: relative; }
+.bo-field {
+  position: relative;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.diff-back {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  overflow: auto;
+  scrollbar-width: none;
+  pointer-events: none;
+  color: var(--ink);
+  font-family: var(--bo);
+  font-size: 1.375rem;
+  font-weight: 400;
+  line-height: 1.7;
+  font-synthesis: none;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.diff-back::-webkit-scrollbar { display: none; }
+
+.diff-back mark {
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  line-height: inherit;
+}
+
+.diff-back .diff-del {
+  background: #f6d0cb;
+  color: #8d2e2e;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: #8d2e2e;
+}
+
+.diff-back .diff-ins {
+  background: #cfead9;
+  color: #17663f;
+}
 
 .bo-caret {
   position: absolute;
   top: 0;
   left: 0;
+  z-index: 2;
   width: 1.5px;
   background: var(--ink);
   pointer-events: none;
