@@ -60,20 +60,25 @@
     return value == null ? "" : String(value);
   }
 
-  const graphemeSegmenter = typeof Intl !== "undefined" && Intl.Segmenter
-    ? new Intl.Segmenter("bo", { granularity: "grapheme" })
-    : null;
-
-  function graphemes(text) {
-    const value = String(text);
-    if (!graphemeSegmenter) return Array.from(value);
-    return [...graphemeSegmenter.segment(value)].map((part) => part.segment);
+  function syllables(text) {
+    const parts = [];
+    let buf = "";
+    for (const ch of String(text)) {
+      buf += ch;
+      if ("་།༎༏༐ \n".includes(ch)) {
+        parts.push(buf);
+        buf = "";
+      }
+    }
+    if (buf) parts.push(buf);
+    return parts;
   }
 
   // Compare the CSV strings as stored. Do not normalize, reshape, or rewrite them.
+  // A change inside a syllable highlights that whole syllable, split on tsheg.
   function diffParts(sourceText, targetText) {
-    const source = graphemes(sourceText);
-    const target = graphemes(targetText);
+    const source = syllables(sourceText);
+    const target = syllables(targetText);
     const n = source.length;
     const m = target.length;
     const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));

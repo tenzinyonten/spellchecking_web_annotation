@@ -362,17 +362,29 @@ textarea.bo:focus {
   line-height: inherit;
 }
 
+.diff-back .diff-del,
+.diff-back .diff-ins {
+  border-radius: 0.2em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 0.15em;
+}
+
 .diff-back .diff-del {
-  background: #f6d0cb;
-  color: #8d2e2e;
-  text-decoration: line-through;
-  text-decoration-thickness: 2px;
+  background: #f3a39a;
+  color: #6e1616;
+  text-decoration: underline line-through;
+  text-decoration-thickness: 0.12em;
   text-decoration-color: #8d2e2e;
 }
 
 .diff-back .diff-ins {
-  background: #cfead9;
-  color: #17663f;
+  background: #8ed4ae;
+  color: #0c4d2c;
+  text-decoration: underline;
+  text-decoration-thickness: 0.12em;
+  text-decoration-color: #17663f;
 }
 
 .bo-caret {
