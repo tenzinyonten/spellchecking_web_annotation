@@ -224,8 +224,8 @@ thead th {
 }
 
 .col-num { width: 3.5rem; }
-.col-text { width: calc((100% - 14.5rem) / 2); }
-.col-status { width: 11rem; }
+.col-text { width: calc((100% - 16.5rem) / 2); }
+.col-status { width: 13rem; }
 
 tbody th, tbody td {
   vertical-align: top;
@@ -437,6 +437,22 @@ textarea.bo:focus {
 }
 
 tr[data-status="accepted"] .status-label { color: var(--accept); }
+tr[data-status="rejected"] .status-label { color: var(--reject); }
+
+tr[data-status="rejected"] th,
+tr[data-status="rejected"] td { background: #fdf6f5; }
+
+tr[data-status="rejected"] th { box-shadow: inset 4px 0 0 var(--reject); }
+
+.status-actions button[data-set-status="accepted"] {
+  color: var(--accept);
+  border-color: #b7d7c6;
+}
+
+.status-actions button[data-set-status="rejected"] {
+  color: var(--reject);
+  border-color: #e4b4ae;
+}
 
 .status-actions {
   display: flex;

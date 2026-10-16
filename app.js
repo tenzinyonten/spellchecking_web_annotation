@@ -1,8 +1,8 @@
 (() => {
   const STORAGE_KEY = "tibetan-sentence-annotation-v2";
   const LEGACY_STORAGE_KEY = "tibetan-sentence-annotation-v1";
-  const ANNOTATION_STATUSES = new Set(["pending", "accepted"]);
-  const FILTERS = ["all", "pending", "accepted"];
+  const ANNOTATION_STATUSES = new Set(["pending", "accepted", "rejected"]);
+  const FILTERS = ["all", "pending", "accepted", "rejected"];
   const MAX_ROWS = 200;
 
   const $ = (id) => document.getElementById(id);
@@ -127,7 +127,8 @@
 
   function priorStatus(value) {
     const status = cellString(value).trim().toLowerCase();
-    if (status === "accepted") return "accepted";
+    if (status === "accepted" || status === "valid") return "accepted";
+    if (status === "rejected") return "rejected";
     return "pending";
   }
 
@@ -230,7 +231,8 @@
   }
 
   function statusLabel(status) {
-    if (status === "accepted") return "Accepted";
+    if (status === "accepted") return "Valid";
+    if (status === "rejected") return "Rejected";
     return "Pending";
   }
 
@@ -328,18 +330,22 @@
     group.className = "status-actions";
     group.setAttribute("role", "group");
     group.setAttribute("aria-label", `Status for row ${index + 1}`);
-    if (row.status === "accepted") {
+    if (row.status === "pending") {
+      const valid = document.createElement("button");
+      valid.type = "button";
+      valid.dataset.setStatus = "accepted";
+      valid.textContent = "Valid";
+      const reject = document.createElement("button");
+      reject.type = "button";
+      reject.dataset.setStatus = "rejected";
+      reject.textContent = "Reject";
+      group.append(valid, reject);
+    } else {
       const back = document.createElement("button");
       back.type = "button";
       back.dataset.movePending = "true";
       back.textContent = "Move back to pending";
       group.append(back);
-    } else {
-      const accept = document.createElement("button");
-      accept.type = "button";
-      accept.dataset.setStatus = "accepted";
-      accept.textContent = "Accept";
-      group.append(accept);
     }
     status.append(label, group);
 
@@ -465,6 +471,12 @@
     els.emptyFilterText.classList.toggle("hidden", pendingDone);
     els.emptyPending.classList.toggle("hidden", !pendingDone);
     if (!pendingDone) els.emptyFilterText.textContent = "No rows in this filter.";
+    const doneNote = els.emptyPending && els.emptyPending.querySelector("p");
+    if (doneNote) {
+      doneNote.textContent = acceptedCount()
+        ? "All rows reviewed."
+        : "Every pair was rejected.";
+    }
     els.tableWrap.classList.toggle("hidden", filteredOut);
 
     for (const button of document.querySelectorAll("[data-filter]")) {
@@ -506,17 +518,25 @@
   function pendingCount() {
     let pending = 0;
     for (const row of state.rows) {
-      if (row.status !== "accepted") pending += 1;
+      if (row.status !== "accepted" && row.status !== "rejected") pending += 1;
     }
     return pending;
   }
 
-  function allRowsAccepted() {
-    return state.rows.length > 0 && pendingCount() === 0;
+  function acceptedCount() {
+    let kept = 0;
+    for (const row of state.rows) {
+      if (row.status === "accepted") kept += 1;
+    }
+    return kept;
+  }
+
+  function allRowsReviewed() {
+    return state.rows.length > 0 && pendingCount() === 0 && acceptedCount() > 0;
   }
 
   function updateDownloadNote() {
-    const ready = allRowsAccepted();
+    const ready = allRowsReviewed();
     els.downloadBtn.disabled = !ready;
     if (els.emptyDownload) els.emptyDownload.disabled = !ready;
   }
@@ -524,7 +544,7 @@
   function reviewedCount(rows) {
     let done = 0;
     for (const row of rows) {
-      if (row.status === "accepted") done += 1;
+      if (row.status === "accepted" || row.status === "rejected") done += 1;
     }
     return done;
   }
@@ -557,9 +577,11 @@
     lastUndo = null;
   }
 
-  function showAcceptToast(index, previousStatus) {
+  function showAcceptToast(index, previousStatus, status) {
     lastUndo = { index, previousStatus };
-    els.toastText.textContent = `Row ${index + 1} accepted.`;
+    els.toastText.textContent = status === "rejected"
+      ? `Row ${index + 1} rejected.`
+      : `Row ${index + 1} marked valid.`;
     els.toast.classList.remove("hidden");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(hideToast, 6000);
@@ -585,15 +607,16 @@
     window.setTimeout(done, prefersReducedMotion() ? 0 : 200);
   }
 
-  function acceptRow(index) {
+  function acceptRow(index, status) {
     const row = state.rows[index];
     if (!row) return;
-    if (row.status === "accepted") return;
+    if (status !== "accepted" && status !== "rejected") return;
+    if (row.status === status) return;
     const previousStatus = row.status;
-    row.status = "accepted";
+    row.status = status;
     markDirty();
     state.activeIndex = index;
-    showAcceptToast(index, previousStatus);
+    showAcceptToast(index, previousStatus, status);
     const scrollY = window.scrollY;
     const tr = els.tbody.querySelector(`tr[data-index="${index}"]`);
     const finish = () => {
@@ -839,9 +862,9 @@
   }
 
   function downloadCsv() {
-    if (!allRowsAccepted() || typeof Papa === "undefined") return;
+    if (!allRowsReviewed() || typeof Papa === "undefined") return;
     const fields = state.headers.slice();
-    const data = state.rows.map((row) => {
+    const data = state.rows.filter((row) => row.status === "accepted").map((row) => {
       const out = Object.create(null);
       for (const field of fields) {
         let value = row.original[field] ?? "";
@@ -917,7 +940,7 @@
   }
 
   function setStatus(index, status) {
-    if (status === "accepted") acceptRow(index);
+    if (status === "accepted" || status === "rejected") acceptRow(index, status);
   }
 
   function onFieldInput(textarea) {
@@ -933,7 +956,7 @@
     }
     markDirty();
     autosize(textarea);
-    if (row.status === "accepted") {
+    if (row.status === "accepted" || row.status === "rejected") {
       row.status = "pending";
       const scrollY = window.scrollY;
       renderRows();

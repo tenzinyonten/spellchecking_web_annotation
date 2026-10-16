@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Tibetan:wght@400;600&display=swap" rel="stylesheet">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" href="favicon.ico" sizes="16x16">
-  <link rel="stylesheet" href="styles.css?v=16">
+  <link rel="stylesheet" href="styles.css?v=17">
 </head>
 <body>
   <header class="wrap site-header">
@@ -34,7 +34,8 @@
         <div id="toolbar" class="filters hidden" role="group" aria-label="Filter rows">
           <button type="button" data-filter="all" aria-pressed="false">All</button>
           <button type="button" data-filter="pending" aria-pressed="true">Pending</button>
-          <button type="button" data-filter="accepted">Accepted</button>
+          <button type="button" data-filter="accepted">Valid</button>
+          <button type="button" data-filter="rejected">Rejected</button>
         </div>
       </div>
       <p id="save-warning" class="save-warning hidden" role="alert">Your progress can't be saved in this browser. Download the CSV now.</p>
@@ -52,7 +53,7 @@
       </p>
       <details>
         <summary>What the download contains</summary>
-        <p>The download is available once every row is accepted, and has all rows. <code>source</code> and <code>target</code> are the text you accepted. No new columns are added.</p>
+        <p>The download is available once every row is marked valid or rejected. It has the valid pairs only. <code>source</code> and <code>target</code> are the text you kept. Rejected pairs are left out. No new columns are added.</p>
         <p>Work is saved in this browser until you download. Downloading clears the batch and brings you back to this page. Reset does the same, and does not delete a file you already downloaded.</p>
       </details>
     </section>
@@ -60,7 +61,7 @@
     <section id="workspace" class="workspace hidden">
       <div id="table-wrap" class="table-wrap">
         <table>
-          <caption class="sr-only">Sentence pairs. Source and target can be edited. The difference is shown above each pair. Accept a row when it is correct.</caption>
+          <caption class="sr-only">Sentence pairs. Source and target can be edited. The difference is shown above each pair. Mark a pair valid to keep it, or reject it to leave it out.</caption>
           <thead>
             <tr>
               <th class="col-num" scope="col">#</th>
@@ -100,6 +101,6 @@
     } catch (error) {}
   </script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>
